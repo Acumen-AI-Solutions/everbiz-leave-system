@@ -219,6 +219,7 @@ function App() {
       setResult(null)
       return
     }
+    
     // FIX: was inside the try block — early return there skipped finally, locking the button
     if (totalHours <= 0) {
       setError('請假時數必須大於 0，請確認開始時間與結束時間')
