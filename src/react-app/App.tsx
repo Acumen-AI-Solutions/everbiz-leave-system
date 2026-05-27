@@ -35,7 +35,7 @@ type LeaveResult = {
   leaveRequestId?: number
 }
 
-type PendingLeave = {
+type LeaveRecord = {
   id: number
   employee_no: string
   employee_name: string
@@ -79,6 +79,13 @@ const employees: Record<string, Employee> = {
     approval_level: 5,
     manager: '',
   },
+  E900: {
+    name: '人資管理員',
+    department: '人資部',
+    position: 'HR',
+    approval_level: 4,
+    manager: 'E100',
+  },
 }
 
 function App() {
@@ -98,15 +105,27 @@ function App() {
   const [result, setResult] = useState<LeaveResult | null>(null)
 
   const [approverNo, setApproverNo] = useState('')
-  const [pendingLeaves, setPendingLeaves] = useState<PendingLeave[]>([])
+  const [pendingLeaves, setPendingLeaves] = useState<LeaveRecord[]>([])
   const [approvalMessage, setApprovalMessage] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLoadingApprovals, setIsLoadingApprovals] = useState(false)
+
+  const [myLeaves, setMyLeaves] = useState<LeaveRecord[]>([])
+  const [myLeaveMessage, setMyLeaveMessage] = useState('')
+  const [isLoadingMyLeaves, setIsLoadingMyLeaves] = useState(false)
+
+  const [hrLeaves, setHrLeaves] = useState<LeaveRecord[]>([])
+  const [hrMessage, setHrMessage] = useState('')
+  const [isLoadingHrLeaves, setIsLoadingHrLeaves] = useState(false)
 
   const canApprove =
     currentUser?.system_role === 'manager' ||
     currentUser?.system_role === 'general_manager' ||
     currentUser?.system_role === 'hr'
+
+  const canViewHrReport =
+    currentUser?.system_role === 'hr' ||
+    currentUser?.system_role === 'general_manager'
 
   async function handleLogin(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -146,9 +165,16 @@ function App() {
       setEmployeeNo(data.user.employee_no)
       setEmployeeName(data.user.name)
       setApproverNo(data.user.employee_no)
+
       setLoginError('')
+      setError('')
       setApprovalMessage('')
+      setMyLeaveMessage('')
+      setHrMessage('')
       setPendingLeaves([])
+      setMyLeaves([])
+      setHrLeaves([])
+      setResult(null)
     } catch (err) {
       setLoginError('登入失敗，請確認 /api/auth/login 是否已建立')
       setCurrentUser(null)
@@ -165,92 +191,13 @@ function App() {
     setEmployeeName('')
     setApproverNo('')
     setPendingLeaves([])
+    setMyLeaves([])
+    setHrLeaves([])
     setApprovalMessage('')
+    setMyLeaveMessage('')
+    setHrMessage('')
     setResult(null)
     setError('')
-  }
-
-  async function loadPendingApprovals() {
-    const normalizedApproverNo = approverNo.trim().toUpperCase()
-
-    if (!normalizedApproverNo) {
-      setApprovalMessage('請輸入主管工號')
-      return
-    }
-
-    setIsLoadingApprovals(true)
-    setApprovalMessage('查詢中...')
-
-    try {
-      const response = await fetch(
-        `/api/approvals/pending?approver_no=${encodeURIComponent(
-          normalizedApproverNo,
-        )}`,
-      )
-
-      const data = await response.json()
-
-      if (!data.ok) {
-        setApprovalMessage(data.message || '查詢待審核資料失敗')
-        setPendingLeaves([])
-        return
-      }
-
-      setPendingLeaves(data.leaves || [])
-      setApprovalMessage(`已載入 ${data.leaves?.length || 0} 筆待審核假單`)
-    } catch (err) {
-      setApprovalMessage('查詢失敗，請確認 API 是否正常')
-      setPendingLeaves([])
-    } finally {
-      setIsLoadingApprovals(false)
-    }
-  }
-
-  async function handleApprovalAction(
-    leaveRequestId: number,
-    action: 'approved' | 'rejected',
-  ) {
-    const normalizedApproverNo = approverNo.trim().toUpperCase()
-
-    if (!normalizedApproverNo) {
-      setApprovalMessage('請輸入主管工號')
-      return
-    }
-
-    const actionText = action === 'approved' ? '核准' : '駁回'
-
-    if (!window.confirm(`確定要${actionText}這張假單嗎？`)) {
-      return
-    }
-
-    setApprovalMessage(`${actionText}處理中...`)
-
-    try {
-      const response = await fetch('/api/approvals/action', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          leave_request_id: leaveRequestId,
-          approver_employee_no: normalizedApproverNo,
-          action,
-          comment: action === 'approved' ? '同意' : '駁回',
-        }),
-      })
-
-      const data = await response.json()
-
-      if (!data.ok) {
-        setApprovalMessage(data.message || '審核失敗')
-        return
-      }
-
-      setApprovalMessage(data.message || `${actionText}完成`)
-      await loadPendingApprovals()
-    } catch (err) {
-      setApprovalMessage('審核失敗，請確認 API 是否正常')
-    }
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -315,14 +262,192 @@ function App() {
         leaveRequestId: data.leave_request_id,
       })
 
-      setError('')
       setReason('')
+      setError('')
+      await loadMyLeavesSilent()
     } catch (err) {
       setError('送出失敗，請確認後端 API 是否正常')
       setResult(null)
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  async function loadPendingApprovals() {
+    const normalizedApproverNo = approverNo.trim().toUpperCase()
+
+    if (!normalizedApproverNo) {
+      setApprovalMessage('請輸入主管工號')
+      return
+    }
+
+    setIsLoadingApprovals(true)
+    setApprovalMessage('查詢中...')
+
+    try {
+      const response = await fetch(
+        `/api/approvals/pending?approver_no=${encodeURIComponent(normalizedApproverNo)}`,
+      )
+
+      const data = await response.json()
+
+      if (!data.ok) {
+        setApprovalMessage(data.message || '查詢待審核資料失敗')
+        setPendingLeaves([])
+        return
+      }
+
+      setPendingLeaves(data.leaves || [])
+      setApprovalMessage(`已載入 ${data.leaves?.length || 0} 筆待審核假單`)
+    } catch (err) {
+      setApprovalMessage('查詢失敗，請確認 API 是否正常')
+      setPendingLeaves([])
+    } finally {
+      setIsLoadingApprovals(false)
+    }
+  }
+
+  async function handleApprovalAction(
+    leaveRequestId: number,
+    action: 'approved' | 'rejected',
+  ) {
+    const normalizedApproverNo = approverNo.trim().toUpperCase()
+
+    if (!normalizedApproverNo) {
+      setApprovalMessage('請輸入主管工號')
+      return
+    }
+
+    const actionText = action === 'approved' ? '核准' : '駁回'
+
+    if (!window.confirm(`確定要${actionText}這張假單嗎？`)) {
+      return
+    }
+
+    setApprovalMessage(`${actionText}處理中...`)
+
+    try {
+      const response = await fetch('/api/approvals/action', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          leave_request_id: leaveRequestId,
+          approver_employee_no: normalizedApproverNo,
+          action,
+          comment: action === 'approved' ? '同意' : '駁回',
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!data.ok) {
+        setApprovalMessage(data.message || '審核失敗')
+        return
+      }
+
+      setApprovalMessage(data.message || `${actionText}完成`)
+      await loadPendingApprovals()
+      await loadMyLeavesSilent()
+
+      if (canViewHrReport) {
+        await loadHrLeavesSilent()
+      }
+    } catch (err) {
+      setApprovalMessage('審核失敗，請確認 API 是否正常')
+    }
+  }
+
+  async function loadMyLeavesSilent() {
+    if (!currentUser) return
+
+    try {
+      const response = await fetch(
+        `/api/leave/my?employee_no=${encodeURIComponent(currentUser.employee_no)}`,
+      )
+
+      const data = await response.json()
+
+      if (data.ok) {
+        setMyLeaves(data.leaves || [])
+      }
+    } catch (err) {
+      // silent refresh only
+    }
+  }
+
+  async function loadMyLeaves() {
+    if (!currentUser) return
+
+    setIsLoadingMyLeaves(true)
+    setMyLeaveMessage('查詢中...')
+
+    try {
+      const response = await fetch(
+        `/api/leave/my?employee_no=${encodeURIComponent(currentUser.employee_no)}`,
+      )
+
+      const data = await response.json()
+
+      if (!data.ok) {
+        setMyLeaveMessage(data.message || '查詢我的假單失敗')
+        setMyLeaves([])
+        return
+      }
+
+      setMyLeaves(data.leaves || [])
+      setMyLeaveMessage(`已載入 ${data.leaves?.length || 0} 筆我的假單`)
+    } catch (err) {
+      setMyLeaveMessage('查詢失敗，請確認 /api/leave/my 是否已建立')
+      setMyLeaves([])
+    } finally {
+      setIsLoadingMyLeaves(false)
+    }
+  }
+
+  async function loadHrLeavesSilent() {
+    try {
+      const response = await fetch('/api/hr/leaves')
+      const data = await response.json()
+
+      if (data.ok) {
+        setHrLeaves(data.leaves || [])
+      }
+    } catch (err) {
+      // silent refresh only
+    }
+  }
+
+  async function loadHrLeaves() {
+    setIsLoadingHrLeaves(true)
+    setHrMessage('查詢中...')
+
+    try {
+      const response = await fetch('/api/hr/leaves')
+      const data = await response.json()
+
+      if (!data.ok) {
+        setHrMessage(data.message || '查詢 HR 報表失敗')
+        setHrLeaves([])
+        return
+      }
+
+      setHrLeaves(data.leaves || [])
+      setHrMessage(`已載入 ${data.leaves?.length || 0} 筆全部假單`)
+    } catch (err) {
+      setHrMessage('查詢失敗，請確認 API 是否正常')
+      setHrLeaves([])
+    } finally {
+      setIsLoadingHrLeaves(false)
+    }
+  }
+
+  function statusText(status: string) {
+    if (status === 'pending') return '待審核'
+    if (status === 'approved') return '已核准'
+    if (status === 'rejected') return '已駁回'
+    return status
   }
 
   return (
@@ -344,11 +469,9 @@ function App() {
           <div className="menu">
             <button type="button">首頁</button>
             <button type="button">請假申請</button>
+            <button type="button">我的假單</button>
             {canApprove && <button type="button">待審核</button>}
-            {(currentUser.system_role === 'hr' ||
-              currentUser.system_role === 'general_manager') && (
-              <button type="button">HR報表</button>
-            )}
+            {canViewHrReport && <button type="button">HR報表</button>}
             <button type="button" onClick={handleLogout}>
               登出
             </button>
@@ -382,7 +505,7 @@ function App() {
           </form>
 
           <p className="small">
-            測試階段 PIN Code 與員工編號相同，例如 E001 / E001、E010 / E010。
+            測試階段 PIN Code 與員工編號相同，例如 E001 / E001、E010 / E010、E900 / E900。
           </p>
         </section>
       )}
@@ -391,6 +514,7 @@ function App() {
         <>
           <section className="card user-card">
             <h2>目前登入</h2>
+
             <div className="summary">
               <div>
                 <span>員工</span>
@@ -398,18 +522,22 @@ function App() {
                   {currentUser.employee_no} {currentUser.name}
                 </strong>
               </div>
+
               <div>
                 <span>部門</span>
                 <strong>{currentUser.department}</strong>
               </div>
+
               <div>
                 <span>職稱</span>
                 <strong>{currentUser.position}</strong>
               </div>
+
               <div>
                 <span>角色</span>
                 <strong>{currentUser.system_role}</strong>
               </div>
+
               <div>
                 <span>簽核層級</span>
                 <strong>{currentUser.approval_level}</strong>
@@ -443,19 +571,9 @@ function App() {
               {error && <div className="alert">{error}</div>}
 
               <form onSubmit={handleSubmit}>
-                <input
-                  value={employeeNo}
-                  onChange={(event) => setEmployeeNo(event.target.value)}
-                  placeholder="員工編號，例如 E001"
-                  readOnly
-                />
+                <input value={employeeNo} readOnly placeholder="員工編號" />
 
-                <input
-                  value={employeeName}
-                  onChange={(event) => setEmployeeName(event.target.value)}
-                  placeholder="姓名，例如 王小明"
-                  readOnly
-                />
+                <input value={employeeName} readOnly placeholder="姓名" />
 
                 <select
                   value={leaveType}
@@ -563,19 +681,55 @@ function App() {
                 </div>
               </div>
 
-              <h3>系統判斷簽核流程</h3>
-
-              <ol className="flow">
-                <li>
-                  {result.currentApproverName}（{result.currentApproverNo}）
-                </li>
-              </ol>
-
               <p className="small">
                 假單已寫入 D1 資料庫，主管可在「主管待審核」區查詢並核准或駁回。
               </p>
             </section>
           )}
+
+          <section className="card result-card">
+            <h2>我的假單</h2>
+
+            <button
+              className="submit-btn"
+              type="button"
+              onClick={loadMyLeaves}
+              disabled={isLoadingMyLeaves}
+            >
+              {isLoadingMyLeaves ? '查詢中...' : '查詢我的假單'}
+            </button>
+
+            {myLeaveMessage && <div className="note-box">{myLeaveMessage}</div>}
+
+            {myLeaves.length === 0 ? (
+              <p className="small">目前沒有請假紀錄。</p>
+            ) : (
+              <div className="approval-list">
+                {myLeaves.map((leave) => (
+                  <div className="approval-item" key={leave.id}>
+                    <div>
+                      <strong>
+                        #{leave.id}｜{leave.leave_type}｜{statusText(leave.status)}
+                      </strong>
+
+                      <p>
+                        日期：{leave.start_date} ~ {leave.end_date}
+                      </p>
+
+                      <p>原因：{leave.reason || '未填寫'}</p>
+
+                      <p>
+                        審核主管：{leave.current_approver_name} /{' '}
+                        {leave.current_approver_no}
+                      </p>
+
+                      <p>建立時間：{leave.created_at}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
 
           {canApprove && (
             <section className="card result-card">
@@ -584,9 +738,8 @@ function App() {
               <div className="approval-search">
                 <input
                   value={approverNo}
-                  onChange={(event) => setApproverNo(event.target.value)}
-                  placeholder="主管工號，例如 E010"
                   readOnly
+                  placeholder="主管工號，例如 E010"
                 />
 
                 <button
@@ -621,7 +774,7 @@ function App() {
 
                         <p>原因：{leave.reason || '未填寫'}</p>
 
-                        <p>狀態：{leave.status}</p>
+                        <p>狀態：{statusText(leave.status)}</p>
 
                         <p>
                           目前審核：{leave.current_approver_name} /{' '}
@@ -649,6 +802,53 @@ function App() {
                         >
                           駁回
                         </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
+
+          {canViewHrReport && (
+            <section className="card result-card">
+              <h2>HR 全部請假資料</h2>
+
+              <button
+                className="submit-btn"
+                type="button"
+                onClick={loadHrLeaves}
+                disabled={isLoadingHrLeaves}
+              >
+                {isLoadingHrLeaves ? '查詢中...' : '查詢全部假單'}
+              </button>
+
+              {hrMessage && <div className="note-box">{hrMessage}</div>}
+
+              {hrLeaves.length === 0 ? (
+                <p className="small">目前沒有請假資料。</p>
+              ) : (
+                <div className="approval-list">
+                  {hrLeaves.map((leave) => (
+                    <div className="approval-item" key={leave.id}>
+                      <div>
+                        <strong>
+                          #{leave.id}｜{leave.employee_no} {leave.employee_name}｜{statusText(leave.status)}
+                        </strong>
+
+                        <p>
+                          {leave.leave_type}｜{leave.start_date} ~{' '}
+                          {leave.end_date}
+                        </p>
+
+                        <p>原因：{leave.reason || '未填寫'}</p>
+
+                        <p>
+                          審核主管：{leave.current_approver_name} /{' '}
+                          {leave.current_approver_no}
+                        </p>
+
+                        <p>建立時間：{leave.created_at}</p>
                       </div>
                     </div>
                   ))}
