@@ -28,6 +28,60 @@ app.options('*', () => {
   })
 })
 
+app.post('/api/auth/login', async (c) => {
+  const body = await c.req.json<{
+    employee_no: string
+    pin_code: string
+  }>()
+
+  const employeeNo = String(body.employee_no || '').trim().toUpperCase()
+  const pinCode = String(body.pin_code || '').trim()
+
+  if (!employeeNo || !pinCode) {
+    return jsonResponse(
+      {
+        ok: false,
+        message: '請輸入員工編號與 PIN Code',
+      },
+      400,
+    )
+  }
+
+  const user = await c.env.DB
+    .prepare(`
+      SELECT
+        employee_no,
+        name,
+        department,
+        position,
+        approval_level,
+        manager_employee_no,
+        system_role,
+        is_active
+      FROM employees
+      WHERE employee_no = ?
+      AND pin_code = ?
+      AND is_active = 1
+    `)
+    .bind(employeeNo, pinCode)
+    .first()
+
+  if (!user) {
+    return jsonResponse(
+      {
+        ok: false,
+        message: '員工編號或 PIN Code 錯誤',
+      },
+      401,
+    )
+  }
+
+  return jsonResponse({
+    ok: true,
+    user,
+  })
+})
+
 app.get('/api/employees', async (c) => {
   const result = await c.env.DB
     .prepare(`
