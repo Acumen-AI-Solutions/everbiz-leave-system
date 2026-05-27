@@ -1,0 +1,20 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "everbiz-leave-system",
+  "main": "src/worker/index.ts",
+  "compatibility_date": "2025-10-08",
+  "assets": {
+    "directory": "./dist/client",
+    "binding": "ASSETS",
+    "run_worker_first": [
+      "/api/*"
+    ]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "everbiz_leave_system",
+      "database_id": "86c4e273-d0ba-46b3-8684-6a944a71a609"
+    }
+  ]
+}
