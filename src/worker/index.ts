@@ -3,7 +3,7 @@ import { Hono } from 'hono'
 type Env = {
   DB: D1Database
 }
-
+ 
 const app = new Hono<{ Bindings: Env }>()
 
 function jsonResponse(data: unknown, status = 200) {
