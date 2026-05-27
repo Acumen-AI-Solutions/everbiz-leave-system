@@ -417,3 +417,25 @@ button:disabled {
     width: 100%;
   }
 }
+.login-card {
+  max-width: 520px;
+  margin: 0 auto 24px;
+}
+
+.login-card h2 {
+  text-align: center;
+}
+
+.login-card .small {
+  text-align: center;
+  margin-top: 14px;
+}
+
+.user-card {
+  margin-bottom: 24px;
+}
+
+input[readonly] {
+  background: #f8fafc;
+  color: #475569;
+}
