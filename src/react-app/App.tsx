@@ -137,7 +137,7 @@ function App() {
 
             <tbody>
 
-              {Object.entries(employees).map(([id, emp]) => (
+              {Object.entries(employees).map(([id, emp]: any) => (
 
                 <tr key={id}>
 
