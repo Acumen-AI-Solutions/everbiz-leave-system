@@ -213,6 +213,34 @@ app.post('/api/leave/create', async (c) => {
     current_approver_name: approverName,
   })
 })
+app.get('/api/leave/my', async (c) => {
+  const employeeNo = c.req.query('employee_no')
+
+  if (!employeeNo) {
+    return jsonResponse(
+      {
+        ok: false,
+        message: '缺少 employee_no',
+      },
+      400,
+    )
+  }
+
+  const result = await c.env.DB
+    .prepare(`
+      SELECT *
+      FROM leave_requests
+      WHERE employee_no = ?
+      ORDER BY created_at DESC
+    `)
+    .bind(employeeNo.trim().toUpperCase())
+    .all()
+
+  return jsonResponse({
+    ok: true,
+    leaves: result.results,
+  })
+})
 
 app.get('/api/approvals/pending', async (c) => {
   const approverNo = c.req.query('approver_no')
@@ -326,6 +354,34 @@ app.post('/api/approvals/action', async (c) => {
   return jsonResponse({
     ok: true,
     message: body.action === 'approved' ? '已核准' : '已駁回',
+  })
+})
+app.get('/api/approvals/history', async (c) => {
+  const approverNo = c.req.query('approver_no')
+
+  if (!approverNo) {
+    return jsonResponse(
+      {
+        ok: false,
+        message: '缺少 approver_no',
+      },
+      400,
+    )
+  }
+
+  const result = await c.env.DB
+    .prepare(`
+      SELECT *
+      FROM leave_requests
+      WHERE current_approver_no = ?
+      ORDER BY updated_at DESC
+    `)
+    .bind(approverNo.trim().toUpperCase())
+    .all()
+
+  return jsonResponse({
+    ok: true,
+    leaves: result.results,
   })
 })
 
