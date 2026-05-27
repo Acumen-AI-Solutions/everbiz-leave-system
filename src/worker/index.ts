@@ -111,18 +111,67 @@ app.post('/api/leave/create', async (c) => {
     name: string
     leave_type: string
     start_date: string
+    start_time: string
     end_date: string
+    end_time: string
+    total_hours: number
     reason?: string
   }>()
 
   const employeeNo = String(body.employee_no || '').trim().toUpperCase()
   const name = String(body.name || '').trim()
+  const leaveType = String(body.leave_type || '').trim()
+  const startDate = String(body.start_date || '').trim()
+  const startTime = String(body.start_time || '').trim()
+  const endDate = String(body.end_date || '').trim()
+  const endTime = String(body.end_time || '').trim()
+  const totalHours = Number(body.total_hours || 0)
 
   if (!employeeNo || !name) {
     return jsonResponse(
       {
         ok: false,
         message: '請輸入員工編號與姓名',
+      },
+      400,
+    )
+  }
+
+  if (!leaveType) {
+    return jsonResponse(
+      {
+        ok: false,
+        message: '請選擇假別',
+      },
+      400,
+    )
+  }
+
+  if (!startDate || !endDate || !startTime || !endTime) {
+    return jsonResponse(
+      {
+        ok: false,
+        message: '請輸入完整的開始日期、開始時間、結束日期與結束時間',
+      },
+      400,
+    )
+  }
+
+  if (totalHours <= 0) {
+    return jsonResponse(
+      {
+        ok: false,
+        message: '請假時數必須大於 0',
+      },
+      400,
+    )
+  }
+
+  if ((totalHours * 10) % 5 !== 0) {
+    return jsonResponse(
+      {
+        ok: false,
+        message: '請假時數必須以 0.5 小時為單位',
       },
       400,
     )
@@ -157,7 +206,6 @@ app.post('/api/leave/create', async (c) => {
   }
 
   const approverNo = employee.manager_employee_no || ''
-
   let approverName = 'HR 留存'
 
   if (approverNo) {
@@ -183,7 +231,10 @@ app.post('/api/leave/create', async (c) => {
         employee_name,
         leave_type,
         start_date,
+        start_time,
         end_date,
+        end_time,
+        total_hours,
         reason,
         status,
         current_approver_no,
@@ -191,14 +242,17 @@ app.post('/api/leave/create', async (c) => {
         created_at,
         updated_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
     `)
     .bind(
       employee.employee_no,
       employee.name,
-      body.leave_type,
-      body.start_date,
-      body.end_date,
+      leaveType,
+      startDate,
+      startTime,
+      endDate,
+      endTime,
+      totalHours,
       body.reason || '',
       approverNo,
       approverName,
@@ -211,8 +265,10 @@ app.post('/api/leave/create', async (c) => {
     leave_request_id: insertResult.meta.last_row_id,
     current_approver_no: approverNo,
     current_approver_name: approverName,
+    total_hours: totalHours,
   })
 })
+
 app.get('/api/leave/my', async (c) => {
   const employeeNo = c.req.query('employee_no')
 
@@ -263,7 +319,7 @@ app.get('/api/approvals/pending', async (c) => {
       AND status = 'pending'
       ORDER BY created_at DESC
     `)
-    .bind(approverNo)
+    .bind(approverNo.trim().toUpperCase())
     .all()
 
   return jsonResponse({
@@ -280,7 +336,12 @@ app.post('/api/approvals/action', async (c) => {
     comment?: string
   }>()
 
-  if (!body.leave_request_id || !body.approver_employee_no || !body.action) {
+  const leaveRequestId = Number(body.leave_request_id || 0)
+  const approverEmployeeNo = String(body.approver_employee_no || '')
+    .trim()
+    .toUpperCase()
+
+  if (!leaveRequestId || !approverEmployeeNo || !body.action) {
     return jsonResponse(
       {
         ok: false,
@@ -308,7 +369,7 @@ app.post('/api/approvals/action', async (c) => {
       AND current_approver_no = ?
       AND status = 'pending'
     `)
-    .bind(body.leave_request_id, body.approver_employee_no)
+    .bind(leaveRequestId, approverEmployeeNo)
     .first()
 
   if (!leave) {
@@ -328,7 +389,7 @@ app.post('/api/approvals/action', async (c) => {
           updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `)
-    .bind(body.action, body.leave_request_id)
+    .bind(body.action, leaveRequestId)
     .run()
 
   await c.env.DB
@@ -344,8 +405,8 @@ app.post('/api/approvals/action', async (c) => {
       VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
     `)
     .bind(
-      body.leave_request_id,
-      body.approver_employee_no,
+      leaveRequestId,
+      approverEmployeeNo,
       body.action,
       body.comment || '',
     )
@@ -356,6 +417,7 @@ app.post('/api/approvals/action', async (c) => {
     message: body.action === 'approved' ? '已核准' : '已駁回',
   })
 })
+
 app.get('/api/approvals/history', async (c) => {
   const approverNo = c.req.query('approver_no')
 
