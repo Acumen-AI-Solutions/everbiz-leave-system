@@ -56,6 +56,8 @@ type LeaveRecord = {
   updated_at: string
 }
 
+type FormType = 'leave' | 'punch' | 'overtime'
+
 const employees: Record<string, Employee> = {
   E001: { name: '王小明', department: '工程部', position: '工程師', approval_level: 1, manager: 'E010' },
   E010: { name: '陳主任', department: '工程部', position: '主任',  approval_level: 2, manager: 'E020' },
@@ -69,7 +71,8 @@ const timeOptions = [
   '08:00', '08:30', '09:00', '09:30', '10:00', '10:30',
   '11:00', '11:30', '12:00', '12:30', '13:00', '13:30',
   '14:00', '14:30', '15:00', '15:30', '16:00', '16:30',
-  '17:00', '17:30', '18:00',
+  '17:00', '17:30', '18:00', '18:30', '19:00', '19:30',
+  '20:00', '20:30', '21:00', '21:30', '22:00',
 ]
 
 function timeToMinutes(time: string): number {
@@ -145,6 +148,11 @@ function calculateLeaveHours(
   return totalMinutes / 60
 }
 
+function calculateSimpleHours(startTime: string, endTime: string): number {
+  const minutes = Math.max(0, timeToMinutes(endTime) - timeToMinutes(startTime))
+  return minutes / 60
+}
+
 function statusText(status: string) {
   if (status === 'pending')  return '待審核'
   if (status === 'approved') return '已核准'
@@ -159,6 +167,7 @@ function App() {
   const [currentUser, setCurrentUser]         = useState<CurrentUser | null>(null)
   const [loginError, setLoginError]           = useState('')
   const [isLoggingIn, setIsLoggingIn]         = useState(false)
+  const [activeForm, setActiveForm]           = useState<FormType>('leave')
 
   // ── Leave form ────────────────────────────────────────────────────────────
   const [employeeNo, setEmployeeNo]   = useState('')
@@ -173,6 +182,21 @@ function App() {
   const [error, setError]             = useState('')
   const [result, setResult]           = useState<LeaveResult | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // ── Punch form ────────────────────────────────────────────────────────────
+  const [punchDate, setPunchDate] = useState('')
+  const [punchType, setPunchType] = useState('上班補卡')
+  const [punchTime, setPunchTime] = useState('08:00')
+  const [punchReason, setPunchReason] = useState('')
+  const [punchMessage, setPunchMessage] = useState('')
+
+  // ── Overtime form ─────────────────────────────────────────────────────────
+  const [overtimeDate, setOvertimeDate] = useState('')
+  const [overtimeStart, setOvertimeStart] = useState('17:30')
+  const [overtimeEnd, setOvertimeEnd] = useState('19:30')
+  const [overtimeType, setOvertimeType] = useState('平日加班')
+  const [overtimeReason, setOvertimeReason] = useState('')
+  const [overtimeMessage, setOvertimeMessage] = useState('')
 
   // ── Approvals ─────────────────────────────────────────────────────────────
   const [approverNo, setApproverNo]           = useState('')
@@ -243,6 +267,8 @@ function App() {
       setMyLeaves([])
       setHrLeaves([])
       setResult(null)
+      setPunchMessage('')
+      setOvertimeMessage('')
     } catch {
       setLoginError('登入失敗，請確認 /api/auth/login 是否已建立')
       setCurrentUser(null)
@@ -266,6 +292,8 @@ function App() {
     setHrMessage('')
     setResult(null)
     setError('')
+    setPunchMessage('')
+    setOvertimeMessage('')
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -353,6 +381,32 @@ function App() {
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  function handlePunchSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    if (!punchDate || !punchTime || !punchReason.trim()) {
+      setPunchMessage('請填寫補卡日期、補卡時間與補卡原因')
+      return
+    }
+
+    setPunchMessage(`補卡申請已建立：${punchType}｜${punchDate} ${punchTime}。目前為前端展示版，下一步可接 D1 補卡資料表與簽核 API。`)
+    setPunchReason('')
+  }
+
+  function handleOvertimeSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    const overtimeHours = calculateSimpleHours(overtimeStart, overtimeEnd)
+
+    if (!overtimeDate || overtimeHours <= 0 || !overtimeReason.trim()) {
+      setOvertimeMessage('請填寫加班日期、正確時間與加班原因')
+      return
+    }
+
+    setOvertimeMessage(`加班申請已建立：${overtimeType}｜${overtimeDate}｜${overtimeHours} 小時。目前為前端展示版，下一步可接 D1 加班資料表與簽核 API。`)
+    setOvertimeReason('')
   }
 
   async function loadPendingApprovals() {
@@ -501,9 +555,9 @@ function App() {
 
         {currentUser && (
           <div className="menu">
-            <button type="button">首頁</button>
-            <button type="button">請假申請</button>
-            <button type="button">我的假單</button>
+            <button type="button" onClick={() => setActiveForm('leave')}>請假申請</button>
+            <button type="button" onClick={() => setActiveForm('punch')}>補卡申請</button>
+            <button type="button" onClick={() => setActiveForm('overtime')}>加班申請</button>
             {canApprove      && <button type="button">待審核</button>}
             {canViewHrReport && <button type="button">HR報表</button>}
             <button type="button" onClick={handleLogout}>登出</button>
@@ -559,84 +613,181 @@ function App() {
                 <img src="https://pub-531c96b02ed745e0bbfd0e96bfde8518.r2.dev/EBC.png" alt="EBC" />
               </div>
               <p className="eyebrow">EVERBIZ INTERNAL HR SYSTEM</p>
-              <h1>請假申請系統 Demo</h1>
-              <p>React + Cloudflare Workers + D1 Database + RWD + PWA</p>
+              <h1>人資申請系統 Demo</h1>
+              <p>請假、補卡、加班申請先完成前端表單；後續再接 D1 Database 與簽核流程。</p>
             </div>
             <div className="badge">PWA</div>
           </header>
 
+          <section className="card result-card">
+            <h2>申請類型</h2>
+            <div className="form-tabs">
+              <button className={activeForm === 'leave' ? 'active' : ''} type="button" onClick={() => setActiveForm('leave')}>請假申請</button>
+              <button className={activeForm === 'punch' ? 'active' : ''} type="button" onClick={() => setActiveForm('punch')}>補卡申請</button>
+              <button className={activeForm === 'overtime' ? 'active' : ''} type="button" onClick={() => setActiveForm('overtime')}>加班申請</button>
+            </div>
+          </section>
+
           <div className="grid">
-            {/* Leave form */}
+            {/* Application forms */}
             <section className="card">
-              <h2>請假申請</h2>
-              {error && <div className="alert">{error}</div>}
-              <form onSubmit={handleSubmit}>
-                <input value={employeeNo}   readOnly placeholder="員工編號" />
-                <input value={employeeName} readOnly placeholder="姓名" />
+              {activeForm === 'leave' && (
+                <>
+                  <h2>請假申請</h2>
+                  {error && <div className="alert">{error}</div>}
+                  <form onSubmit={handleSubmit}>
+                    <input value={employeeNo} readOnly placeholder="員工編號" />
+                    <input value={employeeName} readOnly placeholder="姓名" />
 
-                <select value={leaveType} onChange={(e) => setLeaveType(e.target.value)}>
-                  <option>特休</option>
-                  <option>事假</option>
-                  <option>病假</option>
-                  <option>公假</option>
-                  <option>補休</option>
-                </select>
+                    <select value={leaveType} onChange={(e) => setLeaveType(e.target.value)}>
+                      <option>特休</option>
+                      <option>事假</option>
+                      <option>病假</option>
+                      <option>公假</option>
+                      <option>補休</option>
+                    </select>
 
-                <div className="two">
-                  <input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => {
-                    const value = e.target.value
-                    setStartDate(value)
-                    setTotalHours(calculateLeaveHours(value, startTime, endDate, endTime))
-                  }}
-                  />
-                  <select
-                    value={startTime}
-                    onChange={(e) => {
-                      setStartTime(e.target.value)
-                      setTotalHours(calculateLeaveHours(startDate, e.target.value, endDate, endTime))
-                    }}
-                  >
-                    {timeOptions.map((t) => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                </div>
+                    <div className="two">
+                      <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => {
+                          const value = e.target.value
+                          setStartDate(value)
+                          setTotalHours(calculateLeaveHours(value, startTime, endDate, endTime))
+                        }}
+                      />
+                      <select
+                        value={startTime}
+                        onChange={(e) => {
+                          setStartTime(e.target.value)
+                          setTotalHours(calculateLeaveHours(startDate, e.target.value, endDate, endTime))
+                        }}
+                      >
+                        {timeOptions.map((t) => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                    </div>
 
-                <div className="two">
-                  <input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => {
-                    const value = e.target.value
-                    setEndDate(value)
-                    setTotalHours(calculateLeaveHours(startDate, startTime, value, endTime))
-                   }}
-                  />
-                  <select
-                    value={endTime}
-                    onChange={(e) => {
-                      setEndTime(e.target.value)
-                      setTotalHours(calculateLeaveHours(startDate, startTime, endDate, e.target.value))
-                    }}
-                  >
-                    {timeOptions.map((t) => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                </div>
+                    <div className="two">
+                      <input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => {
+                          const value = e.target.value
+                          setEndDate(value)
+                          setTotalHours(calculateLeaveHours(startDate, startTime, value, endTime))
+                        }}
+                      />
+                      <select
+                        value={endTime}
+                        onChange={(e) => {
+                          setEndTime(e.target.value)
+                          setTotalHours(calculateLeaveHours(startDate, startTime, endDate, e.target.value))
+                        }}
+                      >
+                        {timeOptions.map((t) => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                    </div>
 
-                <div className="note-box">請假時數：{totalHours} 小時</div>
+                    <div className="note-box">請假時數：{totalHours} 小時</div>
 
-                <textarea
-                  rows={5}
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  placeholder="請假原因"
-                />
+                    <textarea
+                      rows={5}
+                      value={reason}
+                      onChange={(e) => setReason(e.target.value)}
+                      placeholder="請假原因"
+                    />
 
-                <button className="submit-btn" type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? '送出中...' : '送出假單'}
-                </button>
-              </form>
+                    <button className="submit-btn" type="submit" disabled={isSubmitting}>
+                      {isSubmitting ? '送出中...' : '送出假單'}
+                    </button>
+                  </form>
+                </>
+              )}
+
+              {activeForm === 'punch' && (
+                <>
+                  <h2>補卡申請</h2>
+                  {punchMessage && <div className="note-box">{punchMessage}</div>}
+                  <form onSubmit={handlePunchSubmit}>
+                    <input value={employeeNo} readOnly placeholder="員工編號" />
+                    <input value={employeeName} readOnly placeholder="姓名" />
+
+                    <select value={punchType} onChange={(e) => setPunchType(e.target.value)}>
+                      <option>上班補卡</option>
+                      <option>下班補卡</option>
+                      <option>上下班補卡</option>
+                      <option>外出返廠補卡</option>
+                    </select>
+
+                    <div className="two">
+                      <input type="date" value={punchDate} onChange={(e) => setPunchDate(e.target.value)} />
+                      <select value={punchTime} onChange={(e) => setPunchTime(e.target.value)}>
+                        {timeOptions.map((t) => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                    </div>
+
+                    <textarea
+                      rows={5}
+                      value={punchReason}
+                      onChange={(e) => setPunchReason(e.target.value)}
+                      placeholder="補卡原因，例如忘記刷卡、卡機異常、外出公務"
+                    />
+
+                    <div className="note-box">簽核流程：部門主管 → 人資單位</div>
+
+                    <button className="submit-btn" type="submit">
+                      送出補卡申請
+                    </button>
+                  </form>
+                </>
+              )}
+
+              {activeForm === 'overtime' && (
+                <>
+                  <h2>加班申請</h2>
+                  {overtimeMessage && <div className="note-box">{overtimeMessage}</div>}
+                  <form onSubmit={handleOvertimeSubmit}>
+                    <input value={employeeNo} readOnly placeholder="員工編號" />
+                    <input value={employeeName} readOnly placeholder="姓名" />
+
+                    <select value={overtimeType} onChange={(e) => setOvertimeType(e.target.value)}>
+                      <option>平日加班</option>
+                      <option>休息日加班</option>
+                      <option>例假日加班</option>
+                      <option>國定假日加班</option>
+                    </select>
+
+                    <input type="date" value={overtimeDate} onChange={(e) => setOvertimeDate(e.target.value)} />
+
+                    <div className="two">
+                      <select value={overtimeStart} onChange={(e) => setOvertimeStart(e.target.value)}>
+                        {timeOptions.map((t) => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                      <select value={overtimeEnd} onChange={(e) => setOvertimeEnd(e.target.value)}>
+                        {timeOptions.map((t) => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                    </div>
+
+                    <div className="note-box">加班時數：{calculateSimpleHours(overtimeStart, overtimeEnd)} 小時</div>
+
+                    <textarea
+                      rows={5}
+                      value={overtimeReason}
+                      onChange={(e) => setOvertimeReason(e.target.value)}
+                      placeholder="加班原因 / 工作內容"
+                    />
+
+                    <div className="note-box">
+                      簽核流程依區域判斷：辦公區為部門主管 → 董事長 → 人資；廠務區依製造/生管流程加簽。
+                    </div>
+
+                    <button className="submit-btn" type="submit">
+                      送出加班申請
+                    </button>
+                  </form>
+                </>
+              )}
             </section>
 
             {/* Employee table */}
