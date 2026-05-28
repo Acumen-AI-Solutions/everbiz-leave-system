@@ -72,11 +72,77 @@ const timeOptions = [
   '17:00', '17:30', '18:00',
 ]
 
-function calculateHours(start: string, end: string): number {
-  const [sh, sm] = start.split(':').map(Number)
-  const [eh, em] = end.split(':').map(Number)
-  const diff = (eh * 60 + em) - (sh * 60 + sm)
-  return diff <= 0 ? 0 : diff / 60
+function timeToMinutes(time: string): number {
+  const [hour, minute] = time.split(':').map(Number)
+  return hour * 60 + minute
+}
+
+function dateToLocal(dateString: string): Date {
+  const [year, month, day] = dateString.split('-').map(Number)
+  return new Date(year, month - 1, day)
+}
+
+function formatDate(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function isWeekend(date: Date): boolean {
+  const day = date.getDay()
+  return day === 0 || day === 6
+}
+
+function calculateLeaveHours(
+  startDate: string,
+  startTime: string,
+  endDate: string,
+  endTime: string,
+): number {
+  if (!startDate || !endDate || !startTime || !endTime) return 0
+
+  const workStart = timeToMinutes('08:00')
+  const workEnd = timeToMinutes('17:00')
+  const lunchStart = timeToMinutes('12:00')
+  const lunchEnd = timeToMinutes('13:00')
+
+  const start = dateToLocal(startDate)
+  const end = dateToLocal(endDate)
+
+  if (start > end) return 0
+
+  let totalMinutes = 0
+  const current = new Date(start)
+
+  while (current <= end) {
+    if (!isWeekend(current)) {
+      const currentDate = formatDate(current)
+
+      let dayStart = workStart
+      let dayEnd = workEnd
+
+      if (currentDate === startDate) {
+        dayStart = Math.max(dayStart, timeToMinutes(startTime))
+      }
+
+      if (currentDate === endDate) {
+        dayEnd = Math.min(dayEnd, timeToMinutes(endTime))
+      }
+
+      let workMinutes = Math.max(0, dayEnd - dayStart)
+
+      const lunchOverlap =
+        Math.max(0, Math.min(dayEnd, lunchEnd) - Math.max(dayStart, lunchStart))
+
+      workMinutes -= lunchOverlap
+      totalMinutes += Math.max(0, workMinutes)
+    }
+
+    current.setDate(current.getDate() + 1)
+  }
+
+  return totalMinutes / 60
 }
 
 function statusText(status: string) {
@@ -102,7 +168,7 @@ function App() {
   const [startTime, setStartTime]     = useState('08:00')
   const [endDate, setEndDate]         = useState('')
   const [endTime, setEndTime]         = useState('17:00')
-  const [totalHours, setTotalHours] = useState(calculateHours('08:00', '17:00'))
+  const [totalHours, setTotalHours] = useState(8)
   const [reason, setReason]           = useState('')
   const [error, setError]             = useState('')
   const [result, setResult]           = useState<LeaveResult | null>(null)
@@ -520,13 +586,17 @@ function App() {
                   <input
                     type="date"
                     value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
+                    onChange={(e) => {
+                    const value = e.target.value
+                    setStartDate(value)
+                    setTotalHours(calculateLeaveHours(value, startTime, endDate, endTime))
+                  }}
                   />
                   <select
                     value={startTime}
                     onChange={(e) => {
                       setStartTime(e.target.value)
-                      setTotalHours(calculateHours(e.target.value, endTime))
+                      setTotalHours(calculateLeaveHours(startDate, e.target.value, endDate, endTime))
                     }}
                   >
                     {timeOptions.map((t) => <option key={t} value={t}>{t}</option>)}
@@ -537,13 +607,17 @@ function App() {
                   <input
                     type="date"
                     value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
+                    onChange={(e) => {
+                    const value = e.target.value
+                    setEndDate(value)
+                    setTotalHours(calculateLeaveHours(startDate, startTime, value, endTime))
+                   }}
                   />
                   <select
                     value={endTime}
                     onChange={(e) => {
                       setEndTime(e.target.value)
-                      setTotalHours(calculateHours(startTime, e.target.value))
+                      setTotalHours(calculateLeaveHours(startDate, startTime, endDate, e.target.value))
                     }}
                   >
                     {timeOptions.map((t) => <option key={t} value={t}>{t}</option>)}
