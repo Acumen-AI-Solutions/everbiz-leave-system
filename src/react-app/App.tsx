@@ -670,7 +670,7 @@ function App() {
               </div>
               <p className="eyebrow">EVERBIZ INTERNAL HR SYSTEM</p>
               <h1>人資申請系統 Demo</h1>
-              <p>請假、補卡、加班申請先完成前端表單；後續再接 D1 Database 與簽核流程。</p>
+              <p>請假、補卡、加班申請已串接 D1 Database，並進入主管簽核流程。</p>
             </div>
             <div className="badge">PWA</div>
           </header>
