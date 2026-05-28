@@ -383,31 +383,87 @@ function App() {
     }
   }
 
-  function handlePunchSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault()
+  async function handlePunchSubmit(event: React.FormEvent<HTMLFormElement>) {
+  event.preventDefault()
 
-    if (!punchDate || !punchTime || !punchReason.trim()) {
-      setPunchMessage('請填寫補卡日期、補卡時間與補卡原因')
+  if (!punchDate || !punchTime || !punchReason.trim()) {
+    setPunchMessage('請填寫補卡日期、補卡時間與補卡原因')
+    return
+  }
+
+  try {
+    const response = await fetch('/api/punch/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        employee_no: employeeNo,
+        name: employeeName,
+        punch_type: punchType,
+        punch_date: punchDate,
+        punch_time: punchTime,
+        reason: punchReason,
+      }),
+    })
+
+    const data = await response.json()
+
+    if (!data.ok) {
+      setPunchMessage(data.message || '補卡申請送出失敗')
       return
     }
 
-    setPunchMessage(`補卡申請已建立：${punchType}｜${punchDate} ${punchTime}。目前為前端展示版，下一步可接 D1 補卡資料表與簽核 API。`)
+    setPunchMessage(
+      `補卡申請已送出，等待 ${data.current_approver_name} / ${data.current_approver_no} 審核。`
+    )
+
     setPunchReason('')
+  } catch {
+    setPunchMessage('補卡申請送出失敗，請確認 /api/punch/create 是否正常')
+  }
+}
+
+  async function handleOvertimeSubmit(event: React.FormEvent<HTMLFormElement>) {
+  event.preventDefault()
+
+  const overtimeHours = calculateSimpleHours(overtimeStart, overtimeEnd)
+
+  if (!overtimeDate || overtimeHours <= 0 || !overtimeReason.trim()) {
+    setOvertimeMessage('請填寫加班日期、正確時間與加班原因')
+    return
   }
 
-  function handleOvertimeSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault()
+  try {
+    const response = await fetch('/api/overtime/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        employee_no: employeeNo,
+        name: employeeName,
+        overtime_type: overtimeType,
+        overtime_date: overtimeDate,
+        start_time: overtimeStart,
+        end_time: overtimeEnd,
+        total_hours: overtimeHours,
+        reason: overtimeReason,
+      }),
+    })
 
-    const overtimeHours = calculateSimpleHours(overtimeStart, overtimeEnd)
+    const data = await response.json()
 
-    if (!overtimeDate || overtimeHours <= 0 || !overtimeReason.trim()) {
-      setOvertimeMessage('請填寫加班日期、正確時間與加班原因')
+    if (!data.ok) {
+      setOvertimeMessage(data.message || '加班申請送出失敗')
       return
     }
 
-    setOvertimeMessage(`加班申請已建立：${overtimeType}｜${overtimeDate}｜${overtimeHours} 小時。目前為前端展示版，下一步可接 D1 加班資料表與簽核 API。`)
+    setOvertimeMessage(
+      `加班申請已送出，等待 ${data.current_approver_name} / ${data.current_approver_no} 審核。`
+    )
+
     setOvertimeReason('')
+  } catch {
+    setOvertimeMessage('加班申請送出失敗，請確認 /api/overtime/create 是否正常')
   }
+}
 
   async function loadPendingApprovals() {
     const normalizedApproverNo = approverNo.trim().toUpperCase()
