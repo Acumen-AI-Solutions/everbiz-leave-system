@@ -269,6 +269,241 @@ app.post('/api/leave/create', async (c) => {
   })
 })
 
+app.post('/api/punch/create', async (c) => {
+  const body = await c.req.json<{
+    employee_no: string
+    name: string
+    punch_type: string
+    punch_date: string
+    punch_time: string
+    reason?: string
+  }>()
+
+  const employeeNo = String(body.employee_no || '').trim().toUpperCase()
+  const name = String(body.name || '').trim()
+  const punchType = String(body.punch_type || '').trim()
+  const punchDate = String(body.punch_date || '').trim()
+  const punchTime = String(body.punch_time || '').trim()
+
+  if (!employeeNo || !name || !punchType || !punchDate || !punchTime) {
+    return jsonResponse(
+      {
+        ok: false,
+        message: '補卡資料不完整',
+      },
+      400,
+    )
+  }
+
+  const employee = await c.env.DB
+    .prepare(`
+      SELECT *
+      FROM employees
+      WHERE employee_no = ?
+      AND name = ?
+      AND is_active = 1
+    `)
+    .bind(employeeNo, name)
+    .first<{
+      employee_no: string
+      name: string
+      manager_employee_no: string | null
+    }>()
+
+  if (!employee) {
+    return jsonResponse(
+      {
+        ok: false,
+        message: '查無此員工，或姓名與員工編號不符合',
+      },
+      404,
+    )
+  }
+
+  const approverNo = employee.manager_employee_no || ''
+  let approverName = 'HR 留存'
+
+  if (approverNo) {
+    const approver = await c.env.DB
+      .prepare(`
+        SELECT name
+        FROM employees
+        WHERE employee_no = ?
+      `)
+      .bind(approverNo)
+      .first<{ name: string }>()
+
+    if (approver) {
+      approverName = approver.name
+    }
+  }
+
+  const insertResult = await c.env.DB
+    .prepare(`
+      INSERT INTO punch_requests
+      (
+        employee_no,
+        employee_name,
+        punch_type,
+        punch_date,
+        punch_time,
+        reason,
+        status,
+        current_approver_no,
+        current_approver_name,
+        created_at,
+        updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    `)
+    .bind(
+      employee.employee_no,
+      employee.name,
+      punchType,
+      punchDate,
+      punchTime,
+      body.reason || '',
+      approverNo,
+      approverName,
+    )
+    .run()
+
+  return jsonResponse({
+    ok: true,
+    message: '補卡申請已送出',
+    punch_request_id: insertResult.meta.last_row_id,
+    current_approver_no: approverNo,
+    current_approver_name: approverName,
+  })
+})
+
+app.post('/api/overtime/create', async (c) => {
+  const body = await c.req.json<{
+    employee_no: string
+    name: string
+    overtime_type: string
+    overtime_date: string
+    start_time: string
+    end_time: string
+    total_hours: number
+    reason?: string
+  }>()
+
+  const employeeNo = String(body.employee_no || '').trim().toUpperCase()
+  const name = String(body.name || '').trim()
+  const overtimeType = String(body.overtime_type || '').trim()
+  const overtimeDate = String(body.overtime_date || '').trim()
+  const startTime = String(body.start_time || '').trim()
+  const endTime = String(body.end_time || '').trim()
+  const totalHours = Number(body.total_hours || 0)
+
+  if (!employeeNo || !name || !overtimeType || !overtimeDate || !startTime || !endTime) {
+    return jsonResponse(
+      {
+        ok: false,
+        message: '加班資料不完整',
+      },
+      400,
+    )
+  }
+
+  if (totalHours <= 0) {
+    return jsonResponse(
+      {
+        ok: false,
+        message: '加班時數必須大於 0',
+      },
+      400,
+    )
+  }
+
+  const employee = await c.env.DB
+    .prepare(`
+      SELECT *
+      FROM employees
+      WHERE employee_no = ?
+      AND name = ?
+      AND is_active = 1
+    `)
+    .bind(employeeNo, name)
+    .first<{
+      employee_no: string
+      name: string
+      manager_employee_no: string | null
+    }>()
+
+  if (!employee) {
+    return jsonResponse(
+      {
+        ok: false,
+        message: '查無此員工，或姓名與員工編號不符合',
+      },
+      404,
+    )
+  }
+
+  const approverNo = employee.manager_employee_no || ''
+  let approverName = 'HR 留存'
+
+  if (approverNo) {
+    const approver = await c.env.DB
+      .prepare(`
+        SELECT name
+        FROM employees
+        WHERE employee_no = ?
+      `)
+      .bind(approverNo)
+      .first<{ name: string }>()
+
+    if (approver) {
+      approverName = approver.name
+    }
+  }
+
+  const insertResult = await c.env.DB
+    .prepare(`
+      INSERT INTO overtime_requests
+      (
+        employee_no,
+        employee_name,
+        overtime_type,
+        overtime_date,
+        start_time,
+        end_time,
+        total_hours,
+        reason,
+        status,
+        current_approver_no,
+        current_approver_name,
+        created_at,
+        updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    `)
+    .bind(
+      employee.employee_no,
+      employee.name,
+      overtimeType,
+      overtimeDate,
+      startTime,
+      endTime,
+      totalHours,
+      body.reason || '',
+      approverNo,
+      approverName,
+    )
+    .run()
+
+  return jsonResponse({
+    ok: true,
+    message: '加班申請已送出',
+    overtime_request_id: insertResult.meta.last_row_id,
+    current_approver_no: approverNo,
+    current_approver_name: approverName,
+    total_hours: totalHours,
+  })
+})
+
 app.get('/api/leave/my', async (c) => {
   const employeeNo = c.req.query('employee_no')
 
