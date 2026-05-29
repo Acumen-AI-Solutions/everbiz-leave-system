@@ -247,9 +247,10 @@ function App() {
     currentUser?.system_role === 'hr'
 
   const canViewHrReport =
-    currentUser?.system_role === 'hr' ||
-    currentUser?.system_role === 'general_manager'
-
+  
+  currentUser?.system_role === 'hr' ||
+  currentUser?.system_role === 'general_manager' ||
+  currentUser?.system_role === 'finance'
   // ── Handlers ─────────────────────────────────────────────────────────────
 
   async function handleLogin(event: React.FormEvent<HTMLFormElement>) {
