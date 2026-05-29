@@ -904,6 +904,40 @@ app.get('/api/hr/leaves', async (c) => {
   })
 })
 
+app.get('/api/hr/report', async (c) => {
+  const leavesResult = await c.env.DB
+    .prepare(`
+      SELECT *
+      FROM leave_requests
+      ORDER BY created_at DESC
+    `)
+    .all()
+
+  const punchesResult = await c.env.DB
+    .prepare(`
+      SELECT *
+      FROM punch_requests
+      ORDER BY created_at DESC
+    `)
+    .all()
+
+  const overtimesResult = await c.env.DB
+    .prepare(`
+      SELECT *
+      FROM overtime_requests
+      ORDER BY created_at DESC
+    `)
+    .all()
+
+  return jsonResponse({
+    ok: true,
+    leaves: leavesResult.results,
+    punches: punchesResult.results,
+    overtimes: overtimesResult.results,
+  })
+})
+
+
 app.get('/', (c) => {
   return c.text('Everbiz leave system API is running.')
 })
