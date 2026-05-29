@@ -1072,14 +1072,14 @@ function App() {
                       <strong>{result.currentApproverName} / {result.currentApproverNo}</strong>
                     </div>
                   </div>
-                  <p className="small">
-                    {t(
-                      lang,
-                      '測試階段 PIN Code 與員工編號相同，例如 E001 / E001、E010 / E010、E900 / E900。',
-                      'During testing, the PIN Code is the same as the employee number, e.g. E001 / E001, E010 / E010, E900 / E900.',
-                      'Trong giai đoạn thử nghiệm, mã PIN giống mã nhân viên, ví dụ E001 / E001, E010 / E010, E900 / E900.',
-                    )}
-                  </p>
+                 <p className="small">
+  {t(
+    lang,
+    '假單已寫入 D1 資料庫，主管可在「主管待審核」區查詢並核准或駁回。',
+    'The leave request has been saved to the D1 database. The manager can review, approve, or reject it in the approval section.',
+    'Đơn nghỉ phép đã được lưu vào D1 database. Quản lý có thể xem, duyệt hoặc từ chối trong mục chờ duyệt.',
+  )}
+</p>
                 </section>
               )}
 
