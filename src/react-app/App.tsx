@@ -704,6 +704,76 @@ function App() {
       setIsLoadingHrLeaves(false)
     }
   }
+  function csvCell(value: unknown) {
+  const text = String(value ?? '')
+  return `"${text.replace(/"/g, '""')}"`
+}
+
+function exportHrLeavesCsv() {
+  if (hrLeaves.length === 0) {
+    setHrMessage('目前沒有資料可以匯出，請先查詢全部假單')
+    return
+  }
+
+  const headers = [
+    '假單編號',
+    '員工編號',
+    '姓名',
+    '假別',
+    '開始日期',
+    '開始時間',
+    '結束日期',
+    '結束時間',
+    '時數',
+    '原因',
+    '狀態',
+    '審核主管編號',
+    '審核主管姓名',
+    '建立時間',
+    '更新時間',
+  ]
+
+  const rows = hrLeaves.map((leave) => [
+    leave.id,
+    leave.employee_no,
+    leave.employee_name,
+    leave.leave_type,
+    leave.start_date,
+    leave.start_time || '',
+    leave.end_date,
+    leave.end_time || '',
+    leave.total_hours ?? '',
+    leave.reason || '',
+    statusText(leave.status),
+    leave.current_approver_no,
+    leave.current_approver_name,
+    leave.created_at,
+    leave.updated_at,
+  ])
+
+  const csvContent = [
+    headers.map(csvCell).join(','),
+    ...rows.map((row) => row.map(csvCell).join(',')),
+  ].join('\r\n')
+
+  const bom = '\uFEFF'
+  const blob = new Blob([bom + csvContent], {
+    type: 'text/csv;charset=utf-8;',
+  })
+
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  const today = new Date().toISOString().slice(0, 10)
+
+  link.href = url
+  link.download = `HR_請假報表_${today}.csv`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+
+  setHrMessage(`已匯出 ${hrLeaves.length} 筆請假報表`)
+}
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -1132,9 +1202,15 @@ function App() {
           {activeSection === 'hr' && canViewHrReport && (
             <section className="card result-card">
               <h2>HR 全部請假資料</h2>
-              <button className="submit-btn" type="button" onClick={loadHrLeaves} disabled={isLoadingHrLeaves}>
-                {isLoadingHrLeaves ? '查詢中...' : '查詢全部假單'}
-              </button>
+              <div className="approval-search">
+  <button className="submit-btn" type="button" onClick={loadHrLeaves} disabled={isLoadingHrLeaves}>
+    {isLoadingHrLeaves ? '查詢中...' : '查詢全部假單'}
+  </button>
+
+  <button className="submit-btn" type="button" onClick={exportHrLeavesCsv}>
+    匯出 Excel
+  </button>
+</div>
               {hrMessage && <div className="note-box">{hrMessage}</div>}
               {hrLeaves.length === 0 ? (
                 <p className="small">目前沒有請假資料。</p>
