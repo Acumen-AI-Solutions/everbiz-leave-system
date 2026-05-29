@@ -55,6 +55,20 @@ type LeaveRecord = {
   created_at: string
   updated_at: string
 }
+type PunchRecord = {
+  id: number
+  employee_no: string
+  employee_name: string
+  punch_type: string
+  punch_date: string
+  punch_time: string
+  reason: string
+  status: string
+  current_approver_no: string
+  current_approver_name: string
+  created_at: string
+  updated_at: string
+}
 
 type FormType = 'leave' | 'punch' | 'overtime'
 
@@ -201,6 +215,7 @@ function App() {
   // ── Approvals ─────────────────────────────────────────────────────────────
   const [approverNo, setApproverNo]           = useState('')
   const [pendingLeaves, setPendingLeaves]     = useState<LeaveRecord[]>([])
+  const [pendingPunches, setPendingPunches]   = useState<PunchRecord[]>([])
   const [approvalMessage, setApprovalMessage] = useState('')
   const [isLoadingApprovals, setIsLoadingApprovals] = useState(false)
 
@@ -264,6 +279,7 @@ function App() {
       setMyLeaveMessage('')
       setHrMessage('')
       setPendingLeaves([])
+      setPendingPunches([])
       setMyLeaves([])
       setHrLeaves([])
       setResult(null)
@@ -285,6 +301,7 @@ function App() {
     setEmployeeName('')
     setApproverNo('')
     setPendingLeaves([])
+    setPendingPunches([])
     setMyLeaves([])
     setHrLeaves([])
     setApprovalMessage('')
@@ -488,10 +505,19 @@ function App() {
       }
 
       setPendingLeaves(data.leaves || [])
-      setApprovalMessage(`已載入 ${data.leaves?.length || 0} 筆待審核假單`)
+      setPendingPunches(data.punches || [])
+
+      const leaveCount = data.leaves?.length || 0
+      const punchCount = data.punches?.length || 0
+      const overtimeCount = data.overtimes?.length || 0
+
+      setApprovalMessage(
+       `已載入 ${leaveCount} 筆假單、${punchCount} 筆補卡、${overtimeCount} 筆加班待審核`
+      )
     } catch {
       setApprovalMessage('查詢失敗，請確認 API 是否正常')
       setPendingLeaves([])
+      setPendingPunches([])
     } finally {
       setIsLoadingApprovals(false)
     }
@@ -932,31 +958,64 @@ function App() {
                 </button>
               </div>
               {approvalMessage && <div className="note-box">{approvalMessage}</div>}
-              {pendingLeaves.length === 0 ? (
-                <p className="small">目前沒有待審核假單。</p>
-              ) : (
-                <div className="approval-list">
-                  {pendingLeaves.map((leave) => (
-                    <div className="approval-item" key={leave.id}>
-                      <div>
-                        <strong>#{leave.id}｜{leave.employee_no} {leave.employee_name}</strong>
-                        <p>
-                          {leave.leave_type}｜{leave.start_date} {leave.start_time || ''} ~{' '}
-                          {leave.end_date} {leave.end_time || ''}
-                        </p>
-                        <p>時數：{leave.total_hours ?? '-'} 小時</p>
-                        <p>原因：{leave.reason || '未填寫'}</p>
-                        <p>狀態：{statusText(leave.status)}</p>
-                        <p>目前審核：{leave.current_approver_name} / {leave.current_approver_no}</p>
-                      </div>
-                      <div className="approval-actions">
-                        <button type="button" className="approve-btn" onClick={() => handleApprovalAction(leave.id, 'approved')}>核准</button>
-                        <button type="button" className="reject-btn"  onClick={() => handleApprovalAction(leave.id, 'rejected')}>駁回</button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              {pendingLeaves.length === 0 && pendingPunches.length === 0 ? (
+  <p className="small">目前沒有待審核資料。</p>
+) : pendingLeaves.length > 0 ? (
+  <div className="approval-list">
+    {pendingLeaves.map((leave) => (
+      <div className="approval-item" key={leave.id}>
+        <div>
+          <strong>#{leave.id}｜{leave.employee_no} {leave.employee_name}</strong>
+          <p>
+            {leave.leave_type}｜{leave.start_date} {leave.start_time || ''} ~{' '}
+            {leave.end_date} {leave.end_time || ''}
+          </p>
+          <p>時數：{leave.total_hours ?? '-'} 小時</p>
+          <p>原因：{leave.reason || '未填寫'}</p>
+          <p>狀態：{statusText(leave.status)}</p>
+          <p>目前審核：{leave.current_approver_name} / {leave.current_approver_no}</p>
+        </div>
+        <div className="approval-actions">
+          <button
+            type="button"
+            className="approve-btn"
+            onClick={() => handleApprovalAction(leave.id, 'approved')}
+          >
+            核准
+          </button>
+          <button
+            type="button"
+            className="reject-btn"
+            onClick={() => handleApprovalAction(leave.id, 'rejected')}
+          >
+            駁回
+          </button>
+        </div>
+      </div>
+    ))}
+  </div>
+) : null}
+
+{pendingPunches.length > 0 && (
+  <>
+    <h3>待審核補卡</h3>
+    <div className="approval-list">
+      {pendingPunches.map((punch) => (
+        <div className="approval-item" key={`punch-${punch.id}`}>
+          <div>
+            <strong>補卡 #{punch.id}｜{punch.employee_no} {punch.employee_name}</strong>
+            <p>{punch.punch_type}｜{punch.punch_date} {punch.punch_time}</p>
+            <p>原因：{punch.reason || '未填寫'}</p>
+            <p>狀態：{statusText(punch.status)}</p>
+            <p>目前審核：{punch.current_approver_name} / {punch.current_approver_no}</p>
+            <p>建立時間：{punch.created_at}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  </>
+)}
+              
             </section>
           )}
 
