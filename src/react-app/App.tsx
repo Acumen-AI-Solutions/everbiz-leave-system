@@ -95,7 +95,7 @@ const employees: Record<string, Employee> = {
   E001: { name: '王小明', department: '工程部', position: '工程師', approval_level: 1, manager: 'E010' },
   E010: { name: '陳主任', department: '工程部', position: '主任',  approval_level: 2, manager: 'E020' },
   E020: { name: '林經理', department: '工程部', position: '經理',  approval_level: 3, manager: 'E100' },
-  E100: { name: '張總經理', department: '總經理室', position: '總經理', approval_level: 5, manager: '' },
+  E100: { name: '陳董事長', department: '董事長室', position: '董事長', approval_level: 5, manager: '' },
   E900: { name: '人資管理員', department: '人資部', position: 'HR', approval_level: 4, manager: 'E100' },
 }
 
