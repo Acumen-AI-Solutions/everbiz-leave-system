@@ -90,14 +90,23 @@ type OvertimeRecord = {
 
 type FormType = 'leave' | 'punch' | 'overtime'
 type SectionType = 'form' | 'approvals' | 'hr'
+type Lang = 'zh' | 'en' | 'vi'
 
+// ── i18n helper ────────────────────────────────────────────────────────────
+function t(lang: Lang, zh: string, en: string, vi: string): string {
+  if (lang === 'en') return en
+  if (lang === 'vi') return vi
+  return zh
+}
+
+// ── Static data ────────────────────────────────────────────────────────────
 const employees: Record<string, Employee> = {
-  E001: { name: '王小明', department: '工程部', position: '工程師', approval_level: 1, manager: 'E010' },
-  E010: { name: '陳主任', department: '工程部', position: '主任',  approval_level: 2, manager: 'E020' },
-  E020: { name: '林經理', department: '工程部', position: '經理',  approval_level: 3, manager: 'E100' },
-  E100: { name: '陳董事長', department: '董事長室', position: '董事長', approval_level: 5, manager: '' },
-  E200: { name: '財務長', department: '財務部', position: '財務長', approval_level: 5, manager: 'E100' },
-  E900: { name: '人資管理員', department: '人資部', position: 'HR', approval_level: 4, manager: 'E100' },
+  E001: { name: '王小明',  department: '工程部',   position: '工程師', approval_level: 1, manager: 'E010' },
+  E010: { name: '陳主任',  department: '工程部',   position: '主任',   approval_level: 2, manager: 'E020' },
+  E020: { name: '林經理',  department: '工程部',   position: '經理',   approval_level: 3, manager: 'E100' },
+  E100: { name: '陳董事長', department: '董事長室', position: '董事長', approval_level: 5, manager: ''    },
+  E200: { name: '財務長',  department: '財務部',   position: '財務長', approval_level: 5, manager: 'E100' },
+  E900: { name: '人資管理員', department: '人資部', position: 'HR',    approval_level: 4, manager: 'E100' },
 }
 
 const timeOptions = [
@@ -108,6 +117,7 @@ const timeOptions = [
   '20:00', '20:30', '21:00', '21:30', '22:00',
 ]
 
+// ── Utility functions ──────────────────────────────────────────────────────
 function timeToMinutes(time: string): number {
   const [hour, minute] = time.split(':').map(Number)
   return hour * 60 + minute
@@ -119,9 +129,9 @@ function dateToLocal(dateString: string): Date {
 }
 
 function formatDate(date: Date): string {
-  const year = date.getFullYear()
+  const year  = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
+  const day   = String(date.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
 }
 
@@ -138,13 +148,13 @@ function calculateLeaveHours(
 ): number {
   if (!startDate || !endDate || !startTime || !endTime) return 0
 
-  const workStart = timeToMinutes('08:00')
-  const workEnd = timeToMinutes('17:00')
+  const workStart  = timeToMinutes('08:00')
+  const workEnd    = timeToMinutes('17:00')
   const lunchStart = timeToMinutes('12:00')
-  const lunchEnd = timeToMinutes('13:00')
+  const lunchEnd   = timeToMinutes('13:00')
 
   const start = dateToLocal(startDate)
-  const end = dateToLocal(endDate)
+  const end   = dateToLocal(endDate)
 
   if (start > end) return 0
 
@@ -155,7 +165,7 @@ function calculateLeaveHours(
     if (!isWeekend(current)) {
       const currentDate = formatDate(current)
       let dayStart = workStart
-      let dayEnd = workEnd
+      let dayEnd   = workEnd
 
       if (currentDate === startDate) dayStart = Math.max(dayStart, timeToMinutes(startTime))
       if (currentDate === endDate)   dayEnd   = Math.min(dayEnd,   timeToMinutes(endTime))
@@ -182,6 +192,12 @@ function statusText(status: string) {
   return status
 }
 
+function csvCell(value: unknown) {
+  const text = String(value ?? '')
+  return `"${text.replace(/"/g, '""')}"`
+}
+
+// ── App ────────────────────────────────────────────────────────────────────
 function App() {
   // ── Auth ──────────────────────────────────────────────────────────────────
   const [loginEmployeeNo, setLoginEmployeeNo] = useState('')
@@ -193,6 +209,7 @@ function App() {
   // ── Navigation ────────────────────────────────────────────────────────────
   const [activeForm, setActiveForm]       = useState<FormType>('leave')
   const [activeSection, setActiveSection] = useState<SectionType>('form')
+  const [lang, setLang]                   = useState<Lang>('zh')
 
   // ── Leave form ────────────────────────────────────────────────────────────
   const [employeeNo, setEmployeeNo]     = useState('')
@@ -216,19 +233,19 @@ function App() {
   const [punchMessage, setPunchMessage] = useState('')
 
   // ── Overtime form ─────────────────────────────────────────────────────────
-  const [overtimeDate, setOvertimeDate]     = useState('')
-  const [overtimeStart, setOvertimeStart]   = useState('17:30')
-  const [overtimeEnd, setOvertimeEnd]       = useState('19:30')
-  const [overtimeType, setOvertimeType]     = useState('平日加班')
-  const [overtimeReason, setOvertimeReason] = useState('')
+  const [overtimeDate, setOvertimeDate]       = useState('')
+  const [overtimeStart, setOvertimeStart]     = useState('17:30')
+  const [overtimeEnd, setOvertimeEnd]         = useState('19:30')
+  const [overtimeType, setOvertimeType]       = useState('平日加班')
+  const [overtimeReason, setOvertimeReason]   = useState('')
   const [overtimeMessage, setOvertimeMessage] = useState('')
 
   // ── Approvals ─────────────────────────────────────────────────────────────
-  const [approverNo, setApproverNo]             = useState('')
-  const [pendingLeaves, setPendingLeaves]         = useState<LeaveRecord[]>([])
-  const [pendingPunches, setPendingPunches]       = useState<PunchRecord[]>([])
-  const [pendingOvertimes, setPendingOvertimes]   = useState<OvertimeRecord[]>([])
-  const [approvalMessage, setApprovalMessage]   = useState('')
+  const [approverNo, setApproverNo]           = useState('')
+  const [pendingLeaves, setPendingLeaves]     = useState<LeaveRecord[]>([])
+  const [pendingPunches, setPendingPunches]   = useState<PunchRecord[]>([])
+  const [pendingOvertimes, setPendingOvertimes] = useState<OvertimeRecord[]>([])
+  const [approvalMessage, setApprovalMessage] = useState('')
   const [isLoadingApprovals, setIsLoadingApprovals] = useState(false)
 
   // ── My leaves ─────────────────────────────────────────────────────────────
@@ -237,8 +254,8 @@ function App() {
   const [isLoadingMyLeaves, setIsLoadingMyLeaves] = useState(false)
 
   // ── HR report ─────────────────────────────────────────────────────────────
-  const [hrLeaves, setHrLeaves]     = useState<LeaveRecord[]>([])
-  const [hrMessage, setHrMessage]   = useState('')
+  const [hrLeaves, setHrLeaves]   = useState<LeaveRecord[]>([])
+  const [hrMessage, setHrMessage] = useState('')
   const [isLoadingHrLeaves, setIsLoadingHrLeaves] = useState(false)
 
   // ── Derived permissions ───────────────────────────────────────────────────
@@ -248,11 +265,11 @@ function App() {
     currentUser?.system_role === 'hr'
 
   const canViewHrReport =
-  
-  currentUser?.system_role === 'hr' ||
-  currentUser?.system_role === 'general_manager' ||
-  currentUser?.system_role === 'finance'
-  // ── Handlers ─────────────────────────────────────────────────────────────
+    currentUser?.system_role === 'hr' ||
+    currentUser?.system_role === 'general_manager' ||
+    currentUser?.system_role === 'finance'
+
+  // ── Handlers ──────────────────────────────────────────────────────────────
 
   async function handleLogin(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -261,7 +278,7 @@ function App() {
     const normalizedPinCode    = pinCode.trim()
 
     if (!normalizedEmployeeNo || !normalizedPinCode) {
-      setLoginError('請輸入員工編號與 PIN Code')
+      setLoginError(t(lang, '請輸入員工編號與 PIN Code', 'Please enter employee number and PIN Code', 'Vui lòng nhập mã nhân viên và mã PIN'))
       return
     }
 
@@ -277,7 +294,7 @@ function App() {
       const data = await response.json()
 
       if (!data.ok) {
-        setLoginError(data.message || '登入失敗')
+        setLoginError(data.message || t(lang, '登入失敗', 'Login failed', 'Đăng nhập thất bại'))
         setCurrentUser(null)
         return
       }
@@ -301,7 +318,7 @@ function App() {
       setOvertimeMessage('')
       setActiveSection('form')
     } catch {
-      setLoginError('登入失敗，請確認 /api/auth/login 是否已建立')
+      setLoginError(t(lang, '登入失敗，請確認 /api/auth/login 是否已建立', 'Login failed. Please check whether /api/auth/login exists.', 'Đăng nhập thất bại. Vui lòng kiểm tra /api/auth/login.'))
       setCurrentUser(null)
     } finally {
       setIsLoggingIn(false)
@@ -383,11 +400,11 @@ function App() {
       const employee = employees[normalizedEmployeeNo]
 
       setResult({
-        employeeNo: normalizedEmployeeNo,
-        employeeName: normalizedEmployeeName,
-        department:    employee?.department    || currentUser?.department    || '由資料庫判斷',
-        position:      employee?.position      || currentUser?.position      || '由資料庫判斷',
-        approvalLevel: employee?.approval_level ?? currentUser?.approval_level ?? 0,
+        employeeNo:          normalizedEmployeeNo,
+        employeeName:        normalizedEmployeeName,
+        department:          employee?.department    || currentUser?.department    || '由資料庫判斷',
+        position:            employee?.position      || currentUser?.position      || '由資料庫判斷',
+        approvalLevel:       employee?.approval_level ?? currentUser?.approval_level ?? 0,
         leaveType,
         startDate,
         startTime,
@@ -425,11 +442,11 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           employee_no: employeeNo,
-          name: employeeName,
-          punch_type: punchType,
-          punch_date: punchDate,
-          punch_time: punchTime,
-          reason: punchReason,
+          name:        employeeName,
+          punch_type:  punchType,
+          punch_date:  punchDate,
+          punch_time:  punchTime,
+          reason:      punchReason,
         }),
       })
 
@@ -462,14 +479,14 @@ function App() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          employee_no: employeeNo,
-          name: employeeName,
+          employee_no:   employeeNo,
+          name:          employeeName,
           overtime_type: overtimeType,
           overtime_date: overtimeDate,
-          start_time: overtimeStart,
-          end_time: overtimeEnd,
-          total_hours: overtimeHours,
-          reason: overtimeReason,
+          start_time:    overtimeStart,
+          end_time:      overtimeEnd,
+          total_hours:   overtimeHours,
+          reason:        overtimeReason,
         }),
       })
 
@@ -511,8 +528,8 @@ function App() {
         return
       }
 
-      setPendingLeaves(data.leaves || [])
-      setPendingPunches(data.punches || [])
+      setPendingLeaves(data.leaves    || [])
+      setPendingPunches(data.punches  || [])
       setPendingOvertimes(data.overtimes || [])
 
       const leaveCount    = data.leaves?.length    || 0
@@ -607,7 +624,6 @@ function App() {
     }
   }
 
-  // FIX #1: Added missing handleOvertimeApprovalAction
   async function handleOvertimeApprovalAction(overtimeRequestId: number, action: 'approved' | 'rejected') {
     const normalizedApproverNo = approverNo.trim().toUpperCase()
     if (!normalizedApproverNo) {
@@ -705,79 +721,60 @@ function App() {
       setIsLoadingHrLeaves(false)
     }
   }
-  function csvCell(value: unknown) {
-  const text = String(value ?? '')
-  return `"${text.replace(/"/g, '""')}"`
-}
 
-function exportHrLeavesCsv() {
-  if (hrLeaves.length === 0) {
-    setHrMessage('目前沒有資料可以匯出，請先查詢全部假單')
-    return
+  function exportHrLeavesCsv() {
+    if (hrLeaves.length === 0) {
+      setHrMessage('目前沒有資料可以匯出，請先查詢全部假單')
+      return
+    }
+
+    const headers = [
+      '假單編號', '員工編號', '姓名', '假別',
+      '開始日期', '開始時間', '結束日期', '結束時間',
+      '時數', '原因', '狀態',
+      '審核主管編號', '審核主管姓名', '建立時間', '更新時間',
+    ]
+
+    const rows = hrLeaves.map((leave) => [
+      leave.id,
+      leave.employee_no,
+      leave.employee_name,
+      leave.leave_type,
+      leave.start_date,
+      leave.start_time || '',
+      leave.end_date,
+      leave.end_time || '',
+      leave.total_hours ?? '',
+      leave.reason || '',
+      statusText(leave.status),
+      leave.current_approver_no,
+      leave.current_approver_name,
+      leave.created_at,
+      leave.updated_at,
+    ])
+
+    const csvContent = [
+      headers.map(csvCell).join(','),
+      ...rows.map((row) => row.map(csvCell).join(',')),
+    ].join('\r\n')
+
+    const bom  = '\uFEFF'
+    const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url  = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    const today = new Date().toISOString().slice(0, 10)
+
+    link.href     = url
+    link.download = `HR_請假報表_${today}.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+
+    setHrMessage(`已匯出 ${hrLeaves.length} 筆請假報表`)
   }
 
-  const headers = [
-    '假單編號',
-    '員工編號',
-    '姓名',
-    '假別',
-    '開始日期',
-    '開始時間',
-    '結束日期',
-    '結束時間',
-    '時數',
-    '原因',
-    '狀態',
-    '審核主管編號',
-    '審核主管姓名',
-    '建立時間',
-    '更新時間',
-  ]
-
-  const rows = hrLeaves.map((leave) => [
-    leave.id,
-    leave.employee_no,
-    leave.employee_name,
-    leave.leave_type,
-    leave.start_date,
-    leave.start_time || '',
-    leave.end_date,
-    leave.end_time || '',
-    leave.total_hours ?? '',
-    leave.reason || '',
-    statusText(leave.status),
-    leave.current_approver_no,
-    leave.current_approver_name,
-    leave.created_at,
-    leave.updated_at,
-  ])
-
-  const csvContent = [
-    headers.map(csvCell).join(','),
-    ...rows.map((row) => row.map(csvCell).join(',')),
-  ].join('\r\n')
-
-  const bom = '\uFEFF'
-  const blob = new Blob([bom + csvContent], {
-    type: 'text/csv;charset=utf-8;',
-  })
-
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  const today = new Date().toISOString().slice(0, 10)
-
-  link.href = url
-  link.download = `HR_請假報表_${today}.csv`
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  URL.revokeObjectURL(url)
-
-  setHrMessage(`已匯出 ${hrLeaves.length} 筆請假報表`)
-}
-
   // ── Render ────────────────────────────────────────────────────────────────
-
   return (
     <div className="page">
       <nav className="top-nav">
@@ -789,7 +786,6 @@ function exportHrLeavesCsv() {
           </div>
         </div>
 
-        {/* FIX #3: Added onClick handlers to nav buttons */}
         {currentUser && (
           <div className="menu">
             <button type="button" onClick={() => { setActiveSection('form'); setActiveForm('leave') }}>請假申請</button>
@@ -805,22 +801,33 @@ function exportHrLeavesCsv() {
       {/* ── Login ── */}
       {!currentUser && (
         <section className="card login-card">
-          <h2>身分確認</h2>
+          <div className="language-row">
+            <label>{t(lang, '語言', 'Language', 'Ngôn ngữ')}</label>
+            <select value={lang} onChange={(e) => setLang(e.target.value as Lang)}>
+              <option value="zh">中文</option>
+              <option value="en">English</option>
+              <option value="vi">Tiếng Việt</option>
+            </select>
+          </div>
+
+          <h2>{t(lang, '身分確認', 'Identity Verification', 'Xác minh danh tính')}</h2>
           {loginError && <div className="alert">{loginError}</div>}
           <form onSubmit={handleLogin}>
             <input
               value={loginEmployeeNo}
               onChange={(e) => setLoginEmployeeNo(e.target.value)}
-              placeholder="員工編號，例如 E010"
+              placeholder={t(lang, '員工編號，例如 E010', 'Employee No., e.g. E010', 'Mã nhân viên, ví dụ E010')}
             />
             <input
               value={pinCode}
               onChange={(e) => setPinCode(e.target.value)}
-              placeholder="PIN Code，例如 E010"
+              placeholder={t(lang, 'PIN Code，例如 E010', 'PIN Code, e.g. E010', 'Mã PIN, ví dụ E010')}
               type="password"
             />
             <button className="submit-btn" type="submit" disabled={isLoggingIn}>
-              {isLoggingIn ? '登入中...' : '進入系統'}
+              {isLoggingIn
+                ? t(lang, '登入中...', 'Logging in...', 'Đang đăng nhập...')
+                : t(lang, '進入系統', 'Enter System', 'Vào hệ thống')}
             </button>
           </form>
           <p className="small">
@@ -876,7 +883,7 @@ function exportHrLeavesCsv() {
                       <h2>請假申請</h2>
                       {error && <div className="alert">{error}</div>}
                       <form onSubmit={handleSubmit}>
-                        <input value={employeeNo} readOnly placeholder="員工編號" />
+                        <input value={employeeNo}   readOnly placeholder="員工編號" />
                         <input value={employeeName} readOnly placeholder="姓名" />
 
                         <select value={leaveType} onChange={(e) => setLeaveType(e.target.value)}>
@@ -950,7 +957,7 @@ function exportHrLeavesCsv() {
                       <h2>補卡申請</h2>
                       {punchMessage && <div className="note-box">{punchMessage}</div>}
                       <form onSubmit={handlePunchSubmit}>
-                        <input value={employeeNo} readOnly placeholder="員工編號" />
+                        <input value={employeeNo}   readOnly placeholder="員工編號" />
                         <input value={employeeName} readOnly placeholder="姓名" />
 
                         <select value={punchType} onChange={(e) => setPunchType(e.target.value)}>
@@ -986,7 +993,7 @@ function exportHrLeavesCsv() {
                       <h2>加班申請</h2>
                       {overtimeMessage && <div className="note-box">{overtimeMessage}</div>}
                       <form onSubmit={handleOvertimeSubmit}>
-                        <input value={employeeNo} readOnly placeholder="員工編號" />
+                        <input value={employeeNo}   readOnly placeholder="員工編號" />
                         <input value={employeeName} readOnly placeholder="姓名" />
 
                         <select value={overtimeType} onChange={(e) => setOvertimeType(e.target.value)}>
@@ -1065,7 +1072,14 @@ function exportHrLeavesCsv() {
                       <strong>{result.currentApproverName} / {result.currentApproverNo}</strong>
                     </div>
                   </div>
-                  <p className="small">假單已寫入 D1 資料庫，主管可在「主管待審核」區查詢並核准或駁回。</p>
+                  <p className="small">
+                    {t(
+                      lang,
+                      '測試階段 PIN Code 與員工編號相同，例如 E001 / E001、E010 / E010、E900 / E900。',
+                      'During testing, the PIN Code is the same as the employee number, e.g. E001 / E001, E010 / E010, E900 / E900.',
+                      'Trong giai đoạn thử nghiệm, mã PIN giống mã nhân viên, ví dụ E001 / E001, E010 / E010, E900 / E900.',
+                    )}
+                  </p>
                 </section>
               )}
 
@@ -1119,7 +1133,7 @@ function exportHrLeavesCsv() {
                 <p className="small">目前沒有待審核資料。</p>
               )}
 
-              {/* FIX #2: Pending leaves — independent block */}
+              {/* Pending leaves */}
               {pendingLeaves.length > 0 && (
                 <>
                   <h3>待審核假單</h3>
@@ -1144,7 +1158,7 @@ function exportHrLeavesCsv() {
                 </>
               )}
 
-              {/* FIX #2: Pending punches — independent block */}
+              {/* Pending punches */}
               {pendingPunches.length > 0 && (
                 <>
                   <h3>待審核補卡</h3>
@@ -1169,7 +1183,7 @@ function exportHrLeavesCsv() {
                 </>
               )}
 
-              {/* FIX #2: Pending overtimes — independent block (was nested inside punch map) */}
+              {/* Pending overtimes */}
               {pendingOvertimes.length > 0 && (
                 <>
                   <h3>待審核加班</h3>
@@ -1187,7 +1201,6 @@ function exportHrLeavesCsv() {
                           <p>建立時間：{overtime.created_at}</p>
                         </div>
                         <div className="approval-actions">
-                          {/* FIX #1: Now calls the handler that actually exists */}
                           <button type="button" className="approve-btn" onClick={() => handleOvertimeApprovalAction(overtime.id, 'approved')}>核准</button>
                           <button type="button" className="reject-btn"  onClick={() => handleOvertimeApprovalAction(overtime.id, 'rejected')}>駁回</button>
                         </div>
@@ -1204,14 +1217,13 @@ function exportHrLeavesCsv() {
             <section className="card result-card">
               <h2>HR 全部請假資料</h2>
               <div className="approval-search">
-  <button className="submit-btn" type="button" onClick={loadHrLeaves} disabled={isLoadingHrLeaves}>
-    {isLoadingHrLeaves ? '查詢中...' : '查詢全部假單'}
-  </button>
-
-  <button className="submit-btn" type="button" onClick={exportHrLeavesCsv}>
-    匯出 Excel
-  </button>
-</div>
+                <button className="submit-btn" type="button" onClick={loadHrLeaves} disabled={isLoadingHrLeaves}>
+                  {isLoadingHrLeaves ? '查詢中...' : '查詢全部假單'}
+                </button>
+                <button className="submit-btn" type="button" onClick={exportHrLeavesCsv}>
+                  匯出 Excel
+                </button>
+              </div>
               {hrMessage && <div className="note-box">{hrMessage}</div>}
               {hrLeaves.length === 0 ? (
                 <p className="small">目前沒有請假資料。</p>
