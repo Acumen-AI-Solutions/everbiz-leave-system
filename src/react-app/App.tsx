@@ -780,6 +780,132 @@ function App() {
       return
     }
 
+    function exportHrPunchesCsv() {
+  if (hrPunches.length === 0) {
+    setHrMessage(t(lang, '目前沒有補卡 / 忘刷資料可以匯出', 'No punch correction data to export.', 'Không có dữ liệu chấm công để xuất.'))
+    return
+  }
+
+  const headers = [
+    t(lang, '補卡編號', 'ID', 'Mã đơn'),
+    t(lang, '員工編號', 'Employee No.', 'Mã NV'),
+    t(lang, '姓名', 'Name', 'Tên'),
+    t(lang, '補卡類型', 'Punch Type', 'Loại chấm công'),
+    t(lang, '補卡日期', 'Punch Date', 'Ngày chấm công'),
+    t(lang, '補卡時間', 'Punch Time', 'Giờ chấm công'),
+    t(lang, '原因', 'Reason', 'Lý do'),
+    t(lang, '狀態', 'Status', 'Trạng thái'),
+    t(lang, '審核主管編號', 'Approver No.', 'Mã quản lý'),
+    t(lang, '審核主管姓名', 'Approver Name', 'Tên quản lý'),
+    t(lang, '建立時間', 'Created At', 'Thời gian tạo'),
+    t(lang, '更新時間', 'Updated At', 'Thời gian cập nhật'),
+  ]
+
+  const rows = hrPunches.map((punch) => [
+    punch.id,
+    punch.employee_no,
+    punch.employee_name,
+    punch.punch_type,
+    punch.punch_date,
+    punch.punch_time,
+    punch.reason || '',
+    statusText(punch.status, lang),
+    punch.current_approver_no,
+    punch.current_approver_name,
+    punch.created_at,
+    punch.updated_at,
+  ])
+
+  const csvContent = [
+    headers.map(csvCell).join(','),
+    ...rows.map((row) => row.map(csvCell).join(',')),
+  ].join('\r\n')
+
+  const bom = '\uFEFF'
+  const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  const today = new Date().toISOString().slice(0, 10)
+
+  link.href = url
+  link.download = `HR_${t(lang, '補卡忘刷報表', 'Punch_Report', 'Bao_cao_cham_cong')}_${today}.csv`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+
+  setHrMessage(t(lang,
+    `已匯出 ${hrPunches.length} 筆補卡 / 忘刷報表`,
+    `Exported ${hrPunches.length} punch correction record(s)`,
+    `Đã xuất ${hrPunches.length} bản ghi chấm công`,
+  ))
+}
+
+function exportHrOvertimesCsv() {
+  if (hrOvertimes.length === 0) {
+    setHrMessage(t(lang, '目前沒有加班資料可以匯出', 'No overtime data to export.', 'Không có dữ liệu tăng ca để xuất.'))
+    return
+  }
+
+  const headers = [
+    t(lang, '加班編號', 'ID', 'Mã đơn'),
+    t(lang, '員工編號', 'Employee No.', 'Mã NV'),
+    t(lang, '姓名', 'Name', 'Tên'),
+    t(lang, '加班類型', 'Overtime Type', 'Loại tăng ca'),
+    t(lang, '加班日期', 'Overtime Date', 'Ngày tăng ca'),
+    t(lang, '開始時間', 'Start Time', 'Giờ bắt đầu'),
+    t(lang, '結束時間', 'End Time', 'Giờ kết thúc'),
+    t(lang, '時數', 'Hours', 'Số giờ'),
+    t(lang, '原因', 'Reason', 'Lý do'),
+    t(lang, '狀態', 'Status', 'Trạng thái'),
+    t(lang, '審核主管編號', 'Approver No.', 'Mã quản lý'),
+    t(lang, '審核主管姓名', 'Approver Name', 'Tên quản lý'),
+    t(lang, '建立時間', 'Created At', 'Thời gian tạo'),
+    t(lang, '更新時間', 'Updated At', 'Thời gian cập nhật'),
+  ]
+
+  const rows = hrOvertimes.map((overtime) => [
+    overtime.id,
+    overtime.employee_no,
+    overtime.employee_name,
+    overtime.overtime_type,
+    overtime.overtime_date,
+    overtime.start_time,
+    overtime.end_time,
+    overtime.total_hours ?? '',
+    overtime.reason || '',
+    statusText(overtime.status, lang),
+    overtime.current_approver_no,
+    overtime.current_approver_name,
+    overtime.created_at,
+    overtime.updated_at,
+  ])
+
+  const csvContent = [
+    headers.map(csvCell).join(','),
+    ...rows.map((row) => row.map(csvCell).join(',')),
+  ].join('\r\n')
+
+  const bom = '\uFEFF'
+  const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  const today = new Date().toISOString().slice(0, 10)
+
+  link.href = url
+  link.download = `HR_${t(lang, '加班報表', 'Overtime_Report', 'Bao_cao_tang_ca')}_${today}.csv`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+
+  setHrMessage(t(lang,
+    `已匯出 ${hrOvertimes.length} 筆加班報表`,
+    `Exported ${hrOvertimes.length} overtime record(s)`,
+    `Đã xuất ${hrOvertimes.length} bản ghi tăng ca`,
+  ))
+}
+
     const headers = [
       t(lang, '假單編號', 'ID', 'Mã đơn'),
       t(lang, '員工編號', 'Employee No.', 'Mã NV'),
