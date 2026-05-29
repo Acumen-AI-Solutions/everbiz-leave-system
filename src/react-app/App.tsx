@@ -254,7 +254,9 @@ function App() {
   const [isLoadingMyLeaves, setIsLoadingMyLeaves] = useState(false)
 
   // ── HR report ─────────────────────────────────────────────────────────────
-  const [hrLeaves, setHrLeaves]   = useState<LeaveRecord[]>([])
+  const [hrLeaves, setHrLeaves] = useState<LeaveRecord[]>([])
+  const [hrPunches, setHrPunches] = useState<PunchRecord[]>([])
+  const [hrOvertimes, setHrOvertimes] = useState<OvertimeRecord[]>([])
   const [hrMessage, setHrMessage] = useState('')
   const [isLoadingHrLeaves, setIsLoadingHrLeaves] = useState(false)
 
@@ -736,30 +738,41 @@ function App() {
     } catch { /* silent */ }
   }
 
-  async function loadHrLeaves() {
-    setIsLoadingHrLeaves(true)
-    setHrMessage(t(lang, '查詢中...', 'Loading...', 'Đang tải...'))
-    try {
-      const response = await fetch('/api/hr/leaves')
-      const data = await response.json()
-      if (!data.ok) {
-        setHrMessage(data.message || t(lang, '查詢 HR 報表失敗', 'Failed to load HR report', 'Tải báo cáo nhân sự thất bại'))
-        setHrLeaves([])
-        return
-      }
-      setHrLeaves(data.leaves || [])
-      setHrMessage(t(lang,
-        `已載入 ${data.leaves?.length || 0} 筆全部假單`,
-        `Loaded ${data.leaves?.length || 0} total leave record(s)`,
-        `Đã tải ${data.leaves?.length || 0} bản ghi nghỉ phép`,
-      ))
-    } catch {
-      setHrMessage(t(lang, '查詢失敗，請確認 API 是否正常', 'Query failed. Please check the API.', 'Truy vấn thất bại. Vui lòng kiểm tra API.'))
+  async function loadHrReport() {
+  setIsLoadingHrLeaves(true)
+  setHrMessage(t(lang, '查詢中...', 'Loading...', 'Đang tải...'))
+
+  try {
+    const response = await fetch('/api/hr/report')
+    const data = await response.json()
+
+    if (!data.ok) {
+      setHrMessage(data.message || t(lang, '查詢 HR 報表失敗', 'Failed to load HR report', 'Tải báo cáo nhân sự thất bại'))
       setHrLeaves([])
-    } finally {
-      setIsLoadingHrLeaves(false)
+      setHrPunches([])
+      setHrOvertimes([])
+      return
     }
+
+    setHrLeaves(data.leaves || [])
+    setHrPunches(data.punches || [])
+    setHrOvertimes(data.overtimes || [])
+
+    setHrMessage(t(
+      lang,
+      `已載入 ${data.leaves?.length || 0} 筆請假、${data.punches?.length || 0} 筆補卡/忘刷、${data.overtimes?.length || 0} 筆加班`,
+      `Loaded ${data.leaves?.length || 0} leave, ${data.punches?.length || 0} punch, ${data.overtimes?.length || 0} overtime records`,
+      `Đã tải ${data.leaves?.length || 0} đơn nghỉ, ${data.punches?.length || 0} đơn chấm công, ${data.overtimes?.length || 0} đơn tăng ca`,
+    ))
+  } catch {
+    setHrMessage(t(lang, '查詢失敗，請確認 API 是否正常', 'Query failed. Please check the API.', 'Truy vấn thất bại. Vui lòng kiểm tra API.'))
+    setHrLeaves([])
+    setHrPunches([])
+    setHrOvertimes([])
+  } finally {
+    setIsLoadingHrLeaves(false)
   }
+}
 
   function exportHrLeavesCsv() {
     if (hrLeaves.length === 0) {
@@ -1339,41 +1352,105 @@ function App() {
             </section>
           )}
 
-          {/* ── HR report section ── */}
-          {activeSection === 'hr' && canViewHrReport && (
-            <section className="card result-card">
-              <h2>{t(lang, 'HR 全部請假資料', 'All HR Leave Records', 'Tất cả dữ liệu nghỉ phép HR')}</h2>
-              <div className="approval-search">
-                <button className="submit-btn" type="button" onClick={loadHrLeaves} disabled={isLoadingHrLeaves}>
-                  {isLoadingHrLeaves
-                    ? t(lang, '查詢中...', 'Loading...', 'Đang tải...')
-                    : t(lang, '查詢全部假單', 'Load All Records', 'Tải tất cả bản ghi')}
-                </button>
-                <button className="submit-btn" type="button" onClick={exportHrLeavesCsv}>
-                  {t(lang, '匯出 Excel', 'Export CSV', 'Xuất CSV')}
-                </button>
-              </div>
-              {hrMessage && <div className="note-box">{hrMessage}</div>}
-              {hrLeaves.length === 0 ? (
-                <p className="small">{t(lang, '目前沒有請假資料。', 'No leave records found.', 'Không có bản ghi nghỉ phép.')}</p>
-              ) : (
-                <div className="approval-list">
-                  {hrLeaves.map((leave) => (
-                    <div className="approval-item" key={leave.id}>
-                      <div>
-                        <strong>#{leave.id}｜{leave.employee_no} {leave.employee_name}｜{statusText(leave.status, lang)}</strong>
-                        <p>{leave.leave_type}｜{leave.start_date} {leave.start_time || ''} ~ {leave.end_date} {leave.end_time || ''}</p>
-                        <p>{t(lang, '時數', 'Hours', 'Số giờ')}：{leave.total_hours ?? '-'} {t(lang, '小時', 'hr(s)', 'giờ')}</p>
-                        <p>{t(lang, '原因', 'Reason', 'Lý do')}：{leave.reason || t(lang, '未填寫', 'N/A', 'Chưa điền')}</p>
-                        <p>{t(lang, '審核主管', 'Approver', 'Người duyệt')}：{leave.current_approver_name} / {leave.current_approver_no}</p>
-                        <p>{t(lang, '建立時間', 'Created At', 'Thời gian tạo')}：{leave.created_at}</p>
-                      </div>
-                    </div>
-                  ))}
+         {/* ── HR report section ── */}
+{activeSection === 'hr' && canViewHrReport && (
+  <section className="card result-card">
+    <h2>{t(lang, 'HR 全部報表', 'All HR Reports', 'Tất cả báo cáo HR')}</h2>
+
+    <div className="approval-search">
+      <button
+        className="submit-btn"
+        type="button"
+        onClick={loadHrReport}
+        disabled={isLoadingHrLeaves}
+      >
+        {isLoadingHrLeaves
+          ? t(lang, '查詢中...', 'Loading...', 'Đang tải...')
+          : t(lang, '查詢全部報表', 'Load All Reports', 'Tải tất cả báo cáo')}
+      </button>
+
+      <button className="submit-btn" type="button" onClick={exportHrLeavesCsv}>
+        {t(lang, '匯出請假報表', 'Export Leave CSV', 'Xuất nghỉ phép CSV')}
+      </button>
+    </div>
+
+    {hrMessage && <div className="note-box">{hrMessage}</div>}
+
+    {hrLeaves.length === 0 && hrPunches.length === 0 && hrOvertimes.length === 0 ? (
+      <p className="small">
+        {t(lang, '目前沒有 HR 報表資料。', 'No HR report records found.', 'Không có dữ liệu báo cáo HR.')}
+      </p>
+    ) : (
+      <>
+        {hrLeaves.length > 0 && (
+          <>
+            <h3>{t(lang, '請假報表', 'Leave Report', 'Báo cáo nghỉ phép')}</h3>
+            <div className="approval-list">
+              {hrLeaves.map((leave) => (
+                <div className="approval-item" key={`hr-leave-${leave.id}`}>
+                  <div>
+                    <strong>
+                      #{leave.id}｜{leave.employee_no} {leave.employee_name}｜{statusText(leave.status, lang)}
+                    </strong>
+                    <p>{leave.leave_type}｜{leave.start_date} {leave.start_time || ''} ~ {leave.end_date} {leave.end_time || ''}</p>
+                    <p>{t(lang, '時數', 'Hours', 'Số giờ')}：{leave.total_hours ?? '-'} {t(lang, '小時', 'hr(s)', 'giờ')}</p>
+                    <p>{t(lang, '原因', 'Reason', 'Lý do')}：{leave.reason || t(lang, '未填寫', 'N/A', 'Chưa điền')}</p>
+                    <p>{t(lang, '審核主管', 'Approver', 'Người duyệt')}：{leave.current_approver_name} / {leave.current_approver_no}</p>
+                    <p>{t(lang, '建立時間', 'Created At', 'Thời gian tạo')}：{leave.created_at}</p>
+                  </div>
                 </div>
-              )}
-            </section>
-          )}
+              ))}
+            </div>
+          </>
+        )}
+
+        {hrPunches.length > 0 && (
+          <>
+            <h3>{t(lang, '補卡 / 忘刷報表', 'Punch Correction Report', 'Báo cáo bổ sung chấm công')}</h3>
+            <div className="approval-list">
+              {hrPunches.map((punch) => (
+                <div className="approval-item" key={`hr-punch-${punch.id}`}>
+                  <div>
+                    <strong>
+                      #{punch.id}｜{punch.employee_no} {punch.employee_name}｜{statusText(punch.status, lang)}
+                    </strong>
+                    <p>{punch.punch_type}｜{punch.punch_date} {punch.punch_time}</p>
+                    <p>{t(lang, '原因', 'Reason', 'Lý do')}：{punch.reason || t(lang, '未填寫', 'N/A', 'Chưa điền')}</p>
+                    <p>{t(lang, '審核主管', 'Approver', 'Người duyệt')}：{punch.current_approver_name} / {punch.current_approver_no}</p>
+                    <p>{t(lang, '建立時間', 'Created At', 'Thời gian tạo')}：{punch.created_at}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {hrOvertimes.length > 0 && (
+          <>
+            <h3>{t(lang, '加班報表', 'Overtime Report', 'Báo cáo tăng ca')}</h3>
+            <div className="approval-list">
+              {hrOvertimes.map((overtime) => (
+                <div className="approval-item" key={`hr-overtime-${overtime.id}`}>
+                  <div>
+                    <strong>
+                      #{overtime.id}｜{overtime.employee_no} {overtime.employee_name}｜{statusText(overtime.status, lang)}
+                    </strong>
+                    <p>{overtime.overtime_type}｜{overtime.overtime_date}</p>
+                    <p>{t(lang, '時間', 'Time', 'Thời gian')}：{overtime.start_time} ~ {overtime.end_time}</p>
+                    <p>{t(lang, '時數', 'Hours', 'Số giờ')}：{overtime.total_hours ?? '-'} {t(lang, '小時', 'hr(s)', 'giờ')}</p>
+                    <p>{t(lang, '原因', 'Reason', 'Lý do')}：{overtime.reason || t(lang, '未填寫', 'N/A', 'Chưa điền')}</p>
+                    <p>{t(lang, '審核主管', 'Approver', 'Người duyệt')}：{overtime.current_approver_name} / {overtime.current_approver_no}</p>
+                    <p>{t(lang, '建立時間', 'Created At', 'Thời gian tạo')}：{overtime.created_at}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </>
+    )}
+  </section>
+)}
         </>
       )}
     </div>
