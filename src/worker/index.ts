@@ -679,6 +679,96 @@ app.post('/api/approvals/action', async (c) => {
   })
 })
 
+app.post('/api/punch/action', async (c) => {
+  const body = await c.req.json<{
+    punch_request_id: number
+    approver_employee_no: string
+    action: 'approved' | 'rejected'
+    comment?: string
+  }>()
+
+  const punchRequestId = Number(body.punch_request_id || 0)
+  const approverEmployeeNo = String(body.approver_employee_no || '')
+    .trim()
+    .toUpperCase()
+
+  if (!punchRequestId || !approverEmployeeNo || !body.action) {
+    return jsonResponse(
+      {
+        ok: false,
+        message: '缺少必要欄位',
+      },
+      400,
+    )
+  }
+
+  if (!['approved', 'rejected'].includes(body.action)) {
+    return jsonResponse(
+      {
+        ok: false,
+        message: 'action 只能是 approved 或 rejected',
+      },
+      400,
+    )
+  }
+
+  const punch = await c.env.DB
+    .prepare(`
+      SELECT *
+      FROM punch_requests
+      WHERE id = ?
+      AND current_approver_no = ?
+      AND status = 'pending'
+    `)
+    .bind(punchRequestId, approverEmployeeNo)
+    .first()
+
+  if (!punch) {
+    return jsonResponse(
+      {
+        ok: false,
+        message: '查無待審核補卡單，或此主管無審核權限',
+      },
+      404,
+    )
+  }
+
+  await c.env.DB
+    .prepare(`
+      UPDATE punch_requests
+      SET status = ?,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `)
+    .bind(body.action, punchRequestId)
+    .run()
+
+  await c.env.DB
+    .prepare(`
+      INSERT INTO punch_approval_logs
+      (
+        punch_request_id,
+        approver_employee_no,
+        action,
+        comment,
+        created_at
+      )
+      VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+    `)
+    .bind(
+      punchRequestId,
+      approverEmployeeNo,
+      body.action,
+      body.comment || '',
+    )
+    .run()
+
+  return jsonResponse({
+    ok: true,
+    message: body.action === 'approved' ? '補卡已核准' : '補卡已駁回',
+  })
+})
+
 app.get('/api/approvals/history', async (c) => {
   const approverNo = c.req.query('approver_no')
 
