@@ -769,6 +769,97 @@ app.post('/api/punch/action', async (c) => {
   })
 })
 
+app.post('/api/overtime/action', async (c) => {
+  const body = await c.req.json<{
+    overtime_request_id: number
+    approver_employee_no: string
+    action: 'approved' | 'rejected'
+    comment?: string
+  }>()
+
+  const overtimeRequestId = Number(body.overtime_request_id || 0)
+  const approverEmployeeNo = String(body.approver_employee_no || '')
+    .trim()
+    .toUpperCase()
+
+  if (!overtimeRequestId || !approverEmployeeNo || !body.action) {
+    return jsonResponse(
+      {
+        ok: false,
+        message: '缺少必要欄位',
+      },
+      400,
+    )
+  }
+
+  if (!['approved', 'rejected'].includes(body.action)) {
+    return jsonResponse(
+      {
+        ok: false,
+        message: 'action 只能是 approved 或 rejected',
+      },
+      400,
+    )
+  }
+
+  const overtime = await c.env.DB
+    .prepare(`
+      SELECT *
+      FROM overtime_requests
+      WHERE id = ?
+      AND current_approver_no = ?
+      AND status = 'pending'
+    `)
+    .bind(overtimeRequestId, approverEmployeeNo)
+    .first()
+
+  if (!overtime) {
+    return jsonResponse(
+      {
+        ok: false,
+        message: '查無待審核加班單，或此主管無審核權限',
+      },
+      404,
+    )
+  }
+
+  await c.env.DB
+    .prepare(`
+      UPDATE overtime_requests
+      SET status = ?,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `)
+    .bind(body.action, overtimeRequestId)
+    .run()
+
+  await c.env.DB
+    .prepare(`
+      INSERT INTO overtime_approval_logs
+      (
+        overtime_request_id,
+        approver_employee_no,
+        action,
+        comment,
+        created_at
+      )
+      VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+    `)
+    .bind(
+      overtimeRequestId,
+      approverEmployeeNo,
+      body.action,
+      body.comment || '',
+    )
+    .run()
+
+  return jsonResponse({
+    ok: true,
+    message: body.action === 'approved' ? '加班已核准' : '加班已駁回',
+  })
+})
+
+
 app.get('/api/approvals/history', async (c) => {
   const approverNo = c.req.query('approver_no')
 
