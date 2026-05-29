@@ -562,6 +562,46 @@ function App() {
     }
   }
 
+  async function handlePunchApprovalAction(punchRequestId: number, action: 'approved' | 'rejected') {
+  const normalizedApproverNo = approverNo.trim().toUpperCase()
+
+  if (!normalizedApproverNo) {
+    setApprovalMessage('請輸入主管工號')
+    return
+  }
+
+  const actionText = action === 'approved' ? '核准' : '駁回'
+
+  if (!window.confirm(`確定要${actionText}這張補卡單嗎？`)) return
+
+  setApprovalMessage(`補卡${actionText}處理中...`)
+
+  try {
+    const response = await fetch('/api/punch/action', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        punch_request_id: punchRequestId,
+        approver_employee_no: normalizedApproverNo,
+        action,
+        comment: action === 'approved' ? '同意補卡' : '駁回補卡',
+      }),
+    })
+
+    const data = await response.json()
+
+    if (!data.ok) {
+      setApprovalMessage(data.message || '補卡審核失敗')
+      return
+    }
+
+    setApprovalMessage(data.message || `補卡${actionText}完成`)
+    await loadPendingApprovals()
+  } catch {
+    setApprovalMessage('補卡審核失敗，請確認 /api/punch/action 是否正常')
+  }
+}
+
   async function loadMyLeavesSilent() {
     if (!currentUser) return
     try {
@@ -1002,15 +1042,33 @@ function App() {
     <div className="approval-list">
       {pendingPunches.map((punch) => (
         <div className="approval-item" key={`punch-${punch.id}`}>
-          <div>
-            <strong>補卡 #{punch.id}｜{punch.employee_no} {punch.employee_name}</strong>
-            <p>{punch.punch_type}｜{punch.punch_date} {punch.punch_time}</p>
-            <p>原因：{punch.reason || '未填寫'}</p>
-            <p>狀態：{statusText(punch.status)}</p>
-            <p>目前審核：{punch.current_approver_name} / {punch.current_approver_no}</p>
-            <p>建立時間：{punch.created_at}</p>
-          </div>
-        </div>
+  <div>
+    <strong>補卡 #{punch.id}｜{punch.employee_no} {punch.employee_name}</strong>
+    <p>{punch.punch_type}｜{punch.punch_date} {punch.punch_time}</p>
+    <p>原因：{punch.reason || '未填寫'}</p>
+    <p>狀態：{statusText(punch.status)}</p>
+    <p>目前審核：{punch.current_approver_name} / {punch.current_approver_no}</p>
+    <p>建立時間：{punch.created_at}</p>
+  </div>
+
+  <div className="approval-actions">
+    <button
+      type="button"
+      className="approve-btn"
+      onClick={() => handlePunchApprovalAction(punch.id, 'approved')}
+    >
+      核准
+    </button>
+
+    <button
+      type="button"
+      className="reject-btn"
+      onClick={() => handlePunchApprovalAction(punch.id, 'rejected')}
+    >
+      駁回
+    </button>
+  </div>
+</div>
       ))}
     </div>
   </>
