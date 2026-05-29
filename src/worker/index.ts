@@ -546,7 +546,9 @@ app.get('/api/approvals/pending', async (c) => {
     )
   }
 
-  const result = await c.env.DB
+  const normalizedApproverNo = approverNo.trim().toUpperCase()
+
+  const leavesResult = await c.env.DB
     .prepare(`
       SELECT *
       FROM leave_requests
@@ -554,12 +556,36 @@ app.get('/api/approvals/pending', async (c) => {
       AND status = 'pending'
       ORDER BY created_at DESC
     `)
-    .bind(approverNo.trim().toUpperCase())
+    .bind(normalizedApproverNo)
+    .all()
+
+  const punchesResult = await c.env.DB
+    .prepare(`
+      SELECT *
+      FROM punch_requests
+      WHERE current_approver_no = ?
+      AND status = 'pending'
+      ORDER BY created_at DESC
+    `)
+    .bind(normalizedApproverNo)
+    .all()
+
+  const overtimesResult = await c.env.DB
+    .prepare(`
+      SELECT *
+      FROM overtime_requests
+      WHERE current_approver_no = ?
+      AND status = 'pending'
+      ORDER BY created_at DESC
+    `)
+    .bind(normalizedApproverNo)
     .all()
 
   return jsonResponse({
     ok: true,
-    leaves: result.results,
+    leaves: leavesResult.results,
+    punches: punchesResult.results,
+    overtimes: overtimesResult.results,
   })
 })
 
