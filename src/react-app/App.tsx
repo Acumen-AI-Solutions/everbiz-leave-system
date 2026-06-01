@@ -11,12 +11,21 @@ type Employee = {
 
 type CurrentUser = {
   employee_no: string
-  name: string
-  department: string
-  position: string
-  approval_level: number
-  manager_employee_no: string
-  system_role: string
+  employee_name: string
+  department_name?: string
+  department?: string
+  position_title?: string
+  position?: string
+  rank_type?: string
+  direct_manager_no?: string
+  direct_manager_name?: string
+  first_proxy_no?: string
+  first_proxy_name?: string
+  second_proxy_no?: string
+  second_proxy_name?: string
+  approval_level?: number
+  manager_employee_no?: string
+  system_role?: string
   is_active: number
 }
 
@@ -303,7 +312,7 @@ function App() {
 
       setCurrentUser(data.user)
       setEmployeeNo(data.user.employee_no)
-      setEmployeeName(data.user.name)
+      setEmployeeName(data.user.employee_name || '')
       setApproverNo(data.user.employee_no)
       setLoginError('')
       setError('')
@@ -333,7 +342,6 @@ function App() {
     }
   }
 
-  // FIX #2: handleLogout now clears hrPunches and hrOvertimes
   function handleLogout() {
     setCurrentUser(null)
     setLoginEmployeeNo('')
@@ -358,17 +366,18 @@ function App() {
     setActiveSection('form')
   }
 
+  // ── FIX 1: 請假送出只帶 employee_no，不帶 name ────────────────────────────
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
-    const normalizedEmployeeNo   = employeeNo.trim().toUpperCase()
-    const normalizedEmployeeName = employeeName.trim()
+    const normalizedEmployeeNo = employeeNo.trim().toUpperCase()
 
-    if (!normalizedEmployeeNo || !normalizedEmployeeName) {
-      setError(t(lang, '請輸入員工編號與姓名', 'Please enter employee number and name', 'Vui lòng nhập mã nhân viên và tên'))
+    if (!normalizedEmployeeNo) {
+      setError(t(lang, '缺少員工編號，請重新登入', 'Missing employee number. Please login again.', 'Thiếu mã nhân viên, vui lòng đăng nhập lại'))
       setResult(null)
       return
     }
+
     if (!startDate || !endDate) {
       setError(t(lang, '請選擇開始日期與結束日期', 'Please select start and end dates', 'Vui lòng chọn ngày bắt đầu và kết thúc'))
       setResult(null)
@@ -389,7 +398,6 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           employee_no: normalizedEmployeeNo,
-          name:        normalizedEmployeeName,
           leave_type:  leaveType,
           start_date:  startDate,
           start_time:  startTime,
@@ -412,9 +420,9 @@ function App() {
 
       setResult({
         employeeNo:          normalizedEmployeeNo,
-        employeeName:        normalizedEmployeeName,
-        department:          employee?.department     || currentUser?.department    || t(lang, '由資料庫判斷', 'From database', 'Từ cơ sở dữ liệu'),
-        position:            employee?.position       || currentUser?.position      || t(lang, '由資料庫判斷', 'From database', 'Từ cơ sở dữ liệu'),
+        employeeName:        employeeName,
+        department:          employee?.department  || currentUser?.department || t(lang, '由資料庫判斷', 'From database', 'Từ cơ sở dữ liệu'),
+        position:            employee?.position    || currentUser?.position   || t(lang, '由資料庫判斷', 'From database', 'Từ cơ sở dữ liệu'),
         approvalLevel:       employee?.approval_level ?? currentUser?.approval_level ?? 0,
         leaveType,
         startDate,
@@ -439,6 +447,7 @@ function App() {
     }
   }
 
+  // ── FIX 2: 補卡送出 body 改正確 ───────────────────────────────────────────
   async function handlePunchSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
@@ -453,7 +462,6 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           employee_no: employeeNo,
-          name:        employeeName,
           punch_type:  punchType,
           punch_date:  punchDate,
           punch_time:  punchTime,
@@ -523,6 +531,7 @@ function App() {
     }
   }
 
+  // ── FIX 3: API 路徑改成 /api/leave/pending ────────────────────────────────
   async function loadPendingApprovals() {
     const normalizedApproverNo = approverNo.trim().toUpperCase()
     if (!normalizedApproverNo) {
@@ -535,7 +544,7 @@ function App() {
 
     try {
       const response = await fetch(
-        `/api/approvals/pending?approver_no=${encodeURIComponent(normalizedApproverNo)}`,
+        `/api/leave/pending?approver_no=${encodeURIComponent(normalizedApproverNo)}`,
       )
       const data = await response.json()
 
@@ -570,6 +579,7 @@ function App() {
     }
   }
 
+  // ── FIX 4: API 路徑改成 /api/leave/approve，欄位名稱對齊 worker ────────────
   async function handleApprovalAction(leaveRequestId: number, action: 'approved' | 'rejected') {
     const normalizedApproverNo = approverNo.trim().toUpperCase()
     if (!normalizedApproverNo) {
@@ -590,16 +600,13 @@ function App() {
     setApprovalMessage(t(lang, `${actionText}處理中...`, 'Processing...', 'Đang xử lý...'))
 
     try {
-      const response = await fetch('/api/approvals/action', {
+      const response = await fetch('/api/leave/approve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          leave_request_id:     leaveRequestId,
-          approver_employee_no: normalizedApproverNo,
+          leave_id:    leaveRequestId,
+          approver_no: normalizedApproverNo,
           action,
-          comment: action === 'approved'
-            ? t(lang, '同意', 'Approved', 'Đồng ý')
-            : t(lang, '駁回', 'Rejected', 'Từ chối'),
         }),
       })
       const data = await response.json()
@@ -747,7 +754,6 @@ function App() {
     }
   }
 
-  // FIX #3: loadHrReportSilent replaces loadHrLeavesSilent — updates all three states
   async function loadHrReportSilent() {
     try {
       const response = await fetch('/api/hr/report')
@@ -795,38 +801,27 @@ function App() {
     }
   }
 
-  // FIX #1: All three export functions are now top-level (not nested)
   function exportHrLeavesCsv() {
     if (hrLeaves.length === 0) {
       setHrMessage(t(lang, '目前沒有請假資料可以匯出', 'No leave data to export.', 'Không có dữ liệu nghỉ phép để xuất.'))
       return
     }
-
     const headers = [
-      t(lang, '假單編號', 'ID', 'Mã đơn'),
-      t(lang, '員工編號', 'Employee No.', 'Mã NV'),
-      t(lang, '姓名', 'Name', 'Tên'),
-      t(lang, '假別', 'Leave Type', 'Loại nghỉ'),
-      t(lang, '開始日期', 'Start Date', 'Ngày bắt đầu'),
-      t(lang, '開始時間', 'Start Time', 'Giờ bắt đầu'),
-      t(lang, '結束日期', 'End Date', 'Ngày kết thúc'),
-      t(lang, '結束時間', 'End Time', 'Giờ kết thúc'),
-      t(lang, '時數', 'Hours', 'Số giờ'),
-      t(lang, '原因', 'Reason', 'Lý do'),
-      t(lang, '狀態', 'Status', 'Trạng thái'),
-      t(lang, '審核主管編號', 'Approver No.', 'Mã quản lý'),
+      t(lang, '假單編號', 'ID', 'Mã đơn'), t(lang, '員工編號', 'Employee No.', 'Mã NV'),
+      t(lang, '姓名', 'Name', 'Tên'), t(lang, '假別', 'Leave Type', 'Loại nghỉ'),
+      t(lang, '開始日期', 'Start Date', 'Ngày bắt đầu'), t(lang, '開始時間', 'Start Time', 'Giờ bắt đầu'),
+      t(lang, '結束日期', 'End Date', 'Ngày kết thúc'), t(lang, '結束時間', 'End Time', 'Giờ kết thúc'),
+      t(lang, '時數', 'Hours', 'Số giờ'), t(lang, '原因', 'Reason', 'Lý do'),
+      t(lang, '狀態', 'Status', 'Trạng thái'), t(lang, '審核主管編號', 'Approver No.', 'Mã quản lý'),
       t(lang, '審核主管姓名', 'Approver Name', 'Tên quản lý'),
-      t(lang, '建立時間', 'Created At', 'Thời gian tạo'),
-      t(lang, '更新時間', 'Updated At', 'Thời gian cập nhật'),
+      t(lang, '建立時間', 'Created At', 'Thời gian tạo'), t(lang, '更新時間', 'Updated At', 'Thời gian cập nhật'),
     ]
-
     const rows = hrLeaves.map((leave) => [
       leave.id, leave.employee_no, leave.employee_name, leave.leave_type,
       leave.start_date, leave.start_time || '', leave.end_date, leave.end_time || '',
       leave.total_hours ?? '', leave.reason || '', statusText(leave.status, lang),
       leave.current_approver_no, leave.current_approver_name, leave.created_at, leave.updated_at,
     ])
-
     downloadCsv(rows, headers, `HR_${t(lang, '請假報表', 'Leave_Report', 'Bao_cao_nghi_phep')}`)
     setHrMessage(t(lang, `已匯出 ${hrLeaves.length} 筆請假報表`, `Exported ${hrLeaves.length} leave record(s)`, `Đã xuất ${hrLeaves.length} bản ghi nghỉ phép`))
   }
@@ -836,29 +831,19 @@ function App() {
       setHrMessage(t(lang, '目前沒有補卡 / 忘刷資料可以匯出', 'No punch correction data to export.', 'Không có dữ liệu chấm công để xuất.'))
       return
     }
-
     const headers = [
-      t(lang, '補卡編號', 'ID', 'Mã đơn'),
-      t(lang, '員工編號', 'Employee No.', 'Mã NV'),
-      t(lang, '姓名', 'Name', 'Tên'),
-      t(lang, '補卡類型', 'Punch Type', 'Loại chấm công'),
-      t(lang, '補卡日期', 'Punch Date', 'Ngày chấm công'),
-      t(lang, '補卡時間', 'Punch Time', 'Giờ chấm công'),
-      t(lang, '原因', 'Reason', 'Lý do'),
-      t(lang, '狀態', 'Status', 'Trạng thái'),
-      t(lang, '審核主管編號', 'Approver No.', 'Mã quản lý'),
-      t(lang, '審核主管姓名', 'Approver Name', 'Tên quản lý'),
-      t(lang, '建立時間', 'Created At', 'Thời gian tạo'),
-      t(lang, '更新時間', 'Updated At', 'Thời gian cập nhật'),
+      t(lang, '補卡編號', 'ID', 'Mã đơn'), t(lang, '員工編號', 'Employee No.', 'Mã NV'),
+      t(lang, '姓名', 'Name', 'Tên'), t(lang, '補卡類型', 'Punch Type', 'Loại chấm công'),
+      t(lang, '補卡日期', 'Punch Date', 'Ngày chấm công'), t(lang, '補卡時間', 'Punch Time', 'Giờ chấm công'),
+      t(lang, '原因', 'Reason', 'Lý do'), t(lang, '狀態', 'Status', 'Trạng thái'),
+      t(lang, '審核主管編號', 'Approver No.', 'Mã quản lý'), t(lang, '審核主管姓名', 'Approver Name', 'Tên quản lý'),
+      t(lang, '建立時間', 'Created At', 'Thời gian tạo'), t(lang, '更新時間', 'Updated At', 'Thời gian cập nhật'),
     ]
-
     const rows = hrPunches.map((punch) => [
       punch.id, punch.employee_no, punch.employee_name, punch.punch_type,
-      punch.punch_date, punch.punch_time, punch.reason || '',
-      statusText(punch.status, lang),
+      punch.punch_date, punch.punch_time, punch.reason || '', statusText(punch.status, lang),
       punch.current_approver_no, punch.current_approver_name, punch.created_at, punch.updated_at,
     ])
-
     downloadCsv(rows, headers, `HR_${t(lang, '補卡忘刷報表', 'Punch_Report', 'Bao_cao_cham_cong')}`)
     setHrMessage(t(lang, `已匯出 ${hrPunches.length} 筆補卡 / 忘刷報表`, `Exported ${hrPunches.length} punch correction record(s)`, `Đã xuất ${hrPunches.length} bản ghi chấm công`))
   }
@@ -868,42 +853,30 @@ function App() {
       setHrMessage(t(lang, '目前沒有加班資料可以匯出', 'No overtime data to export.', 'Không có dữ liệu tăng ca để xuất.'))
       return
     }
-
     const headers = [
-      t(lang, '加班編號', 'ID', 'Mã đơn'),
-      t(lang, '員工編號', 'Employee No.', 'Mã NV'),
-      t(lang, '姓名', 'Name', 'Tên'),
-      t(lang, '加班類型', 'Overtime Type', 'Loại tăng ca'),
-      t(lang, '加班日期', 'Overtime Date', 'Ngày tăng ca'),
-      t(lang, '開始時間', 'Start Time', 'Giờ bắt đầu'),
-      t(lang, '結束時間', 'End Time', 'Giờ kết thúc'),
-      t(lang, '時數', 'Hours', 'Số giờ'),
-      t(lang, '原因', 'Reason', 'Lý do'),
-      t(lang, '狀態', 'Status', 'Trạng thái'),
-      t(lang, '審核主管編號', 'Approver No.', 'Mã quản lý'),
-      t(lang, '審核主管姓名', 'Approver Name', 'Tên quản lý'),
-      t(lang, '建立時間', 'Created At', 'Thời gian tạo'),
-      t(lang, '更新時間', 'Updated At', 'Thời gian cập nhật'),
+      t(lang, '加班編號', 'ID', 'Mã đơn'), t(lang, '員工編號', 'Employee No.', 'Mã NV'),
+      t(lang, '姓名', 'Name', 'Tên'), t(lang, '加班類型', 'Overtime Type', 'Loại tăng ca'),
+      t(lang, '加班日期', 'Overtime Date', 'Ngày tăng ca'), t(lang, '開始時間', 'Start Time', 'Giờ bắt đầu'),
+      t(lang, '結束時間', 'End Time', 'Giờ kết thúc'), t(lang, '時數', 'Hours', 'Số giờ'),
+      t(lang, '原因', 'Reason', 'Lý do'), t(lang, '狀態', 'Status', 'Trạng thái'),
+      t(lang, '審核主管編號', 'Approver No.', 'Mã quản lý'), t(lang, '審核主管姓名', 'Approver Name', 'Tên quản lý'),
+      t(lang, '建立時間', 'Created At', 'Thời gian tạo'), t(lang, '更新時間', 'Updated At', 'Thời gian cập nhật'),
     ]
-
     const rows = hrOvertimes.map((overtime) => [
       overtime.id, overtime.employee_no, overtime.employee_name, overtime.overtime_type,
       overtime.overtime_date, overtime.start_time, overtime.end_time, overtime.total_hours ?? '',
       overtime.reason || '', statusText(overtime.status, lang),
       overtime.current_approver_no, overtime.current_approver_name, overtime.created_at, overtime.updated_at,
     ])
-
     downloadCsv(rows, headers, `HR_${t(lang, '加班報表', 'Overtime_Report', 'Bao_cao_tang_ca')}`)
     setHrMessage(t(lang, `已匯出 ${hrOvertimes.length} 筆加班報表`, `Exported ${hrOvertimes.length} overtime record(s)`, `Đã xuất ${hrOvertimes.length} bản ghi tăng ca`))
   }
 
-  // Shared CSV download helper
   function downloadCsv(rows: unknown[][], headers: string[], filename: string) {
     const csvContent = [
       headers.map(csvCell).join(','),
       ...rows.map((row) => row.map(csvCell).join(',')),
     ].join('\r\n')
-
     const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' })
     const url  = URL.createObjectURL(blob)
     const link = document.createElement('a')
@@ -1000,15 +973,14 @@ function App() {
       {/* ── Authenticated ── */}
       {currentUser && (
         <>
-          {/* Current user banner */}
           <section className="card user-card">
             <h2>{t(lang, '目前登入', 'Current User', 'Người dùng hiện tại')}</h2>
             <div className="summary">
-              <div><span>{t(lang, '員工', 'Employee', 'Nhân viên')}</span><strong>{currentUser.employee_no} {currentUser.name}</strong></div>
-              <div><span>{t(lang, '部門', 'Department', 'Bộ phận')}</span><strong>{currentUser.department}</strong></div>
-              <div><span>{t(lang, '職稱', 'Position', 'Chức vụ')}</span><strong>{currentUser.position}</strong></div>
-              <div><span>{t(lang, '角色', 'Role', 'Vai trò')}</span><strong>{currentUser.system_role}</strong></div>
-              <div><span>{t(lang, '簽核層級', 'Approval Level', 'Cấp phê duyệt')}</span><strong>{currentUser.approval_level}</strong></div>
+              <div><span>{t(lang, '員工', 'Employee', 'Nhân viên')}</span><strong>{currentUser.employee_no} {currentUser.employee_name}</strong></div>
+              <div><span>{t(lang, '部門', 'Department', 'Bộ phận')}</span><strong>{currentUser.department_name || currentUser.department || '-'}</strong></div>
+              <div><span>{t(lang, '職稱', 'Position', 'Chức vụ')}</span><strong>{currentUser.position_title || currentUser.position || '-'}</strong></div>
+              <div><span>{t(lang, '角色', 'Role', 'Vai trò')}</span><strong>{currentUser.system_role || '-'}</strong></div>
+              <div><span>{t(lang, '簽核層級', 'Approval Level', 'Cấp phê duyệt')}</span><strong>{currentUser.approval_level ?? '-'}</strong></div>
             </div>
           </section>
 
@@ -1047,7 +1019,6 @@ function App() {
               </section>
 
               <div className="grid">
-                {/* Application forms */}
                 <section className="card">
                   {activeForm === 'leave' && (
                     <>
@@ -1224,7 +1195,6 @@ function App() {
                   )}
                 </section>
 
-                {/* Employee table */}
                 <section className="card">
                   <h2>{t(lang, '員工資料', 'Employee Data', 'Thông tin nhân viên')}</h2>
                   <table>
@@ -1250,7 +1220,6 @@ function App() {
                 </section>
               </div>
 
-              {/* Submit result */}
               {result && (
                 <section className="card result-card">
                   <h2>{t(lang, '假單送出結果', 'Leave Submission Result', 'Kết quả gửi đơn nghỉ phép')}</h2>
@@ -1281,7 +1250,6 @@ function App() {
                 </section>
               )}
 
-              {/* My leaves */}
               <section className="card result-card">
                 <h2>{t(lang, '我的假單', 'My Leave Requests', 'Đơn nghỉ phép của tôi')}</h2>
                 <button className="submit-btn" type="button" onClick={loadMyLeaves} disabled={isLoadingMyLeaves}>
@@ -1318,12 +1286,7 @@ function App() {
               <h2>{t(lang, '主管待審核', 'Manager Pending Approval', 'Quản lý chờ duyệt')}</h2>
               <div className="approval-search">
                 <input value={approverNo} readOnly placeholder={t(lang, '主管工號，例如 E010', 'Manager No., e.g. E010', 'Mã quản lý, ví dụ E010')} />
-                <button
-                  className="submit-btn"
-                  type="button"
-                  onClick={loadPendingApprovals}
-                  disabled={isLoadingApprovals}
-                >
+                <button className="submit-btn" type="button" onClick={loadPendingApprovals} disabled={isLoadingApprovals}>
                   {isLoadingApprovals
                     ? t(lang, '查詢中...', 'Loading...', 'Đang tải...')
                     : t(lang, '查詢待審核', 'Load Pending', 'Tải danh sách chờ')}
@@ -1427,7 +1390,6 @@ function App() {
           {activeSection === 'hr' && canViewHrReport && (
             <section className="card result-card">
               <h2>{t(lang, 'HR 全部報表', 'All HR Reports', 'Tất cả báo cáo HR')}</h2>
-
               <div className="approval-search">
                 <button className="submit-btn" type="button" onClick={loadHrReport} disabled={isLoadingHrLeaves}>
                   {isLoadingHrLeaves
