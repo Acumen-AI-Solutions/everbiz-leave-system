@@ -859,22 +859,46 @@ function App() {
       setHrMessage(t(lang, '目前沒有請假資料可以匯出', 'No leave data to export.', 'Không có dữ liệu nghỉ phép để xuất.'))
       return
     }
-    const headers = [
-      t(lang, '假單編號', 'ID', 'Mã đơn'), t(lang, '員工編號', 'Employee No.', 'Mã NV'),
-      t(lang, '姓名', 'Name', 'Tên'), t(lang, '假別', 'Leave Type', 'Loại nghỉ'),
-      t(lang, '開始日期', 'Start Date', 'Ngày bắt đầu'), t(lang, '開始時間', 'Start Time', 'Giờ bắt đầu'),
-      t(lang, '結束日期', 'End Date', 'Ngày kết thúc'), t(lang, '結束時間', 'End Time', 'Giờ kết thúc'),
-      t(lang, '時數', 'Hours', 'Số giờ'), t(lang, '原因', 'Reason', 'Lý do'),
-      t(lang, '狀態', 'Status', 'Trạng thái'), t(lang, '審核主管編號', 'Approver No.', 'Mã quản lý'),
-      t(lang, '審核主管姓名', 'Approver Name', 'Tên quản lý'),
-      t(lang, '建立時間', 'Created At', 'Thời gian tạo'), t(lang, '更新時間', 'Updated At', 'Thời gian cập nhật'),
-    ]
+   const headers = [
+  t(lang, '假單編號', 'ID', 'Mã đơn'),
+  t(lang, '員工編號', 'Employee No.', 'Mã NV'),
+  t(lang, '姓名', 'Name', 'Tên'),
+  t(lang, '假別', 'Leave Type', 'Loại nghỉ'),
+  t(lang, '開始日期', 'Start Date', 'Ngày bắt đầu'),
+  t(lang, '開始時間', 'Start Time', 'Giờ bắt đầu'),
+  t(lang, '結束日期', 'End Date', 'Ngày kết thúc'),
+  t(lang, '結束時間', 'End Time', 'Giờ kết thúc'),
+  t(lang, '時數', 'Hours', 'Số giờ'),
+  t(lang, '原因', 'Reason', 'Lý do'),
+  t(lang, '狀態', 'Status', 'Trạng thái'),
+  t(lang, '審核主管編號', 'Approver No.', 'Mã quản lý'),
+  t(lang, '審核主管姓名', 'Approver Name', 'Tên quản lý'),
+  t(lang, '作廢人員編號', 'Voided By No.', 'Mã người hủy'),
+  t(lang, '作廢人員姓名', 'Voided By Name', 'Tên người hủy'),
+  t(lang, '作廢原因', 'Void Reason', 'Lý do hủy'),
+  t(lang, '建立時間', 'Created At', 'Thời gian tạo'),
+  t(lang, '更新時間', 'Updated At', 'Thời gian cập nhật'),
+]
     const rows = hrLeaves.map((leave) => [
-      leave.id, leave.employee_no, leave.employee_name, leave.leave_type,
-      leave.start_date, leave.start_time || '', leave.end_date, leave.end_time || '',
-      leave.total_hours ?? '', leave.reason || '', statusText(leave.status, lang),
-      leave.current_approver_no, leave.current_approver_name, leave.created_at, leave.updated_at,
-    ])
+  leave.id,
+  leave.employee_no,
+  leave.employee_name,
+  leave.leave_type,
+  leave.start_date,
+  leave.start_time || '',
+  leave.end_date,
+  leave.end_time || '',
+  leave.total_hours ?? '',
+  leave.reason || '',
+  statusText(leave.status, lang),
+  leave.current_approver_no,
+  leave.current_approver_name,
+  leave.voided_by_no || '',
+  leave.voided_by_name || '',
+  leave.void_reason || '',
+  leave.created_at,
+  leave.updated_at,
+])
     downloadCsv(rows, headers, `HR_${t(lang, '請假報表', 'Leave_Report', 'Bao_cao_nghi_phep')}`)
     setHrMessage(t(lang, `已匯出 ${hrLeaves.length} 筆請假報表`, `Exported ${hrLeaves.length} leave record(s)`, `Đã xuất ${hrLeaves.length} bản ghi nghỉ phép`))
   }
@@ -884,14 +908,20 @@ function App() {
       setHrMessage(t(lang, '目前沒有補卡 / 忘刷資料可以匯出', 'No punch correction data to export.', 'Không có dữ liệu chấm công để xuất.'))
       return
     }
-    const headers = [
-      t(lang, '補卡編號', 'ID', 'Mã đơn'), t(lang, '員工編號', 'Employee No.', 'Mã NV'),
-      t(lang, '姓名', 'Name', 'Tên'), t(lang, '補卡類型', 'Punch Type', 'Loại chấm công'),
-      t(lang, '補卡日期', 'Punch Date', 'Ngày chấm công'), t(lang, '補卡時間', 'Punch Time', 'Giờ chấm công'),
-      t(lang, '原因', 'Reason', 'Lý do'), t(lang, '狀態', 'Status', 'Trạng thái'),
-      t(lang, '審核主管編號', 'Approver No.', 'Mã quản lý'), t(lang, '審核主管姓名', 'Approver Name', 'Tên quản lý'),
-      t(lang, '建立時間', 'Created At', 'Thời gian tạo'), t(lang, '更新時間', 'Updated At', 'Thời gian cập nhật'),
-    ]
+   const headers = [
+  t(lang, '補卡編號', 'ID', 'Mã đơn'),
+  t(lang, '員工編號', 'Employee No.', 'Mã NV'),
+  t(lang, '姓名', 'Name', 'Tên'),
+  t(lang, '補卡類型', 'Punch Type', 'Loại chấm công'),
+  t(lang, '補卡日期', 'Punch Date', 'Ngày chấm công'),
+  t(lang, '補卡時間', 'Punch Time', 'Giờ chấm công'),
+  t(lang, '原因', 'Reason', 'Lý do'),
+  t(lang, '狀態', 'Status', 'Trạng thái'),
+  t(lang, '審核主管編號', 'Approver No.', 'Mã quản lý'),
+  t(lang, '審核主管姓名', 'Approver Name', 'Tên quản lý'),
+  t(lang, '建立時間', 'Created At', 'Thời gian tạo'),
+  t(lang, '更新時間', 'Updated At', 'Thời gian cập nhật'),
+]
     const rows = hrPunches.map((punch) => [
       punch.id, punch.employee_no, punch.employee_name, punch.punch_type,
       punch.punch_date, punch.punch_time, punch.reason || '', statusText(punch.status, lang),
