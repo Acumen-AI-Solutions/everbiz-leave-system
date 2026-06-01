@@ -366,9 +366,12 @@ function App() {
     setActiveSection('form')
   }
 
-  // ── FIX 1: 請假送出只帶 employee_no，不帶 name ────────────────────────────
+  // ── 請假送出（整合防重複送出）──────────────────────────────────────────
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
+
+    // 防止連點造成重複送出
+    if (isSubmitting) return
 
     const normalizedEmployeeNo = employeeNo.trim().toUpperCase()
 
@@ -447,7 +450,6 @@ function App() {
     }
   }
 
-  // ── FIX 2: 補卡送出 body 改正確 ───────────────────────────────────────────
   async function handlePunchSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
@@ -531,7 +533,6 @@ function App() {
     }
   }
 
-  // ── FIX 3: API 路徑改成 /api/leave/pending ────────────────────────────────
   async function loadPendingApprovals() {
     const normalizedApproverNo = approverNo.trim().toUpperCase()
     if (!normalizedApproverNo) {
@@ -579,7 +580,6 @@ function App() {
     }
   }
 
-  // ── FIX 4: API 路徑改成 /api/leave/approve，欄位名稱對齊 worker ────────────
   async function handleApprovalAction(leaveRequestId: number, action: 'approved' | 'rejected') {
     const normalizedApproverNo = approverNo.trim().toUpperCase()
     if (!normalizedApproverNo) {
