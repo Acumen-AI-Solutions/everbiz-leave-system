@@ -65,6 +65,10 @@ type LeaveRecord = {
   voided_by_no?: string
   voided_by_name?: string
   void_reason?: string
+  cancelled_by_no?: string
+  cancelled_by_name?: string
+  cancel_reason?: string
+  cancelled_at?: string
   created_at: string
   updated_at: string
 }
@@ -199,10 +203,11 @@ function calculateSimpleHours(startTime: string, endTime: string): number {
 }
 
 function statusText(status: string, lang: Lang) {
-  if (status === 'pending')  return t(lang, '待審核', 'Pending',  'Chờ duyệt')
-  if (status === 'approved') return t(lang, '已核准', 'Approved', 'Đã duyệt')
-  if (status === 'rejected') return t(lang, '已駁回', 'Rejected', 'Đã từ chối')
-  if (status === 'voided')   return t(lang, '已作廢', 'Voided',   'Đã hủy')
+  if (status === 'pending')   return t(lang, '待審核', 'Pending',  'Chờ duyệt')
+  if (status === 'approved')  return t(lang, '已核准', 'Approved', 'Đã duyệt')
+  if (status === 'rejected')  return t(lang, '已駁回', 'Rejected', 'Đã từ chối')
+  if (status === 'voided')    return t(lang, '已作廢', 'Voided',   'Đã hủy')
+  if (status === 'cancelled') return t(lang, '已取消', 'Cancelled', 'Đã hủy bỏ')
   return status
 }
 
@@ -807,6 +812,56 @@ function App() {
     }
   }
 
+  // ── 取消假單（申請人本人取消待審核假單）────────────────────────────────
+  async function handleCancelLeave(leaveId: number) {
+    if (!currentUser) return
+
+    const cancelReason = window.prompt(
+      t(lang, '請輸入取消原因', 'Please enter cancellation reason', 'Vui lòng nhập lý do hủy đơn')
+    )
+
+    if (!cancelReason || !cancelReason.trim()) {
+      setMyLeaveMessage(t(lang, '已取消操作，未輸入原因', 'Cancelled: no reason entered', 'Đã hủy thao tác: chưa nhập lý do'))
+      return
+    }
+
+    if (!window.confirm(
+      t(lang,
+        '確定要取消這張假單嗎？取消後無法恢復，且狀態將改為已取消。',
+        'Are you sure you want to cancel this leave request? It cannot be undone and the status will become cancelled.',
+        'Bạn có chắc muốn hủy đơn nghỉ phép này không? Sau khi hủy không thể khôi phục, trạng thái sẽ chuyển thành đã hủy.')
+    )) {
+      return
+    }
+
+    setMyLeaveMessage(t(lang, '取消處理中...', 'Cancelling...', 'Đang xử lý hủy...'))
+
+    try {
+      const response = await fetch('/api/leave/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          leave_id: leaveId,
+          employee_no: currentUser.employee_no,
+          cancel_reason: cancelReason.trim(),
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!data.ok) {
+        setMyLeaveMessage(data.message || t(lang, '取消失敗', 'Cancellation failed', 'Hủy thất bại'))
+        return
+      }
+
+      setMyLeaveMessage(data.message || t(lang, '假單已取消', 'Leave request cancelled', 'Đơn nghỉ phép đã bị hủy'))
+      await loadMyLeaves()
+      if (canViewHrReport) await loadHrReportSilent()
+    } catch {
+      setMyLeaveMessage(t(lang, '取消失敗，請確認 /api/leave/cancel 是否正常', 'Cancellation failed. Please check /api/leave/cancel.', 'Hủy thất bại. Vui lòng kiểm tra /api/leave/cancel.'))
+    }
+  }
+
   async function loadHrReportSilent() {
     try {
       const response = await fetch('/api/hr/report')
@@ -859,46 +914,54 @@ function App() {
       setHrMessage(t(lang, '目前沒有請假資料可以匯出', 'No leave data to export.', 'Không có dữ liệu nghỉ phép để xuất.'))
       return
     }
-   const headers = [
-  t(lang, '假單編號', 'ID', 'Mã đơn'),
-  t(lang, '員工編號', 'Employee No.', 'Mã NV'),
-  t(lang, '姓名', 'Name', 'Tên'),
-  t(lang, '假別', 'Leave Type', 'Loại nghỉ'),
-  t(lang, '開始日期', 'Start Date', 'Ngày bắt đầu'),
-  t(lang, '開始時間', 'Start Time', 'Giờ bắt đầu'),
-  t(lang, '結束日期', 'End Date', 'Ngày kết thúc'),
-  t(lang, '結束時間', 'End Time', 'Giờ kết thúc'),
-  t(lang, '時數', 'Hours', 'Số giờ'),
-  t(lang, '原因', 'Reason', 'Lý do'),
-  t(lang, '狀態', 'Status', 'Trạng thái'),
-  t(lang, '審核主管編號', 'Approver No.', 'Mã quản lý'),
-  t(lang, '審核主管姓名', 'Approver Name', 'Tên quản lý'),
-  t(lang, '作廢人員編號', 'Voided By No.', 'Mã người hủy'),
-  t(lang, '作廢人員姓名', 'Voided By Name', 'Tên người hủy'),
-  t(lang, '作廢原因', 'Void Reason', 'Lý do hủy'),
-  t(lang, '建立時間', 'Created At', 'Thời gian tạo'),
-  t(lang, '更新時間', 'Updated At', 'Thời gian cập nhật'),
-]
+    const headers = [
+      t(lang, '假單編號', 'ID', 'Mã đơn'),
+      t(lang, '員工編號', 'Employee No.', 'Mã NV'),
+      t(lang, '姓名', 'Name', 'Tên'),
+      t(lang, '假別', 'Leave Type', 'Loại nghỉ'),
+      t(lang, '開始日期', 'Start Date', 'Ngày bắt đầu'),
+      t(lang, '開始時間', 'Start Time', 'Giờ bắt đầu'),
+      t(lang, '結束日期', 'End Date', 'Ngày kết thúc'),
+      t(lang, '結束時間', 'End Time', 'Giờ kết thúc'),
+      t(lang, '時數', 'Hours', 'Số giờ'),
+      t(lang, '原因', 'Reason', 'Lý do'),
+      t(lang, '狀態', 'Status', 'Trạng thái'),
+      t(lang, '審核主管編號', 'Approver No.', 'Mã quản lý'),
+      t(lang, '審核主管姓名', 'Approver Name', 'Tên quản lý'),
+      t(lang, '作廢人員編號', 'Voided By No.', 'Mã người hủy'),
+      t(lang, '作廢人員姓名', 'Voided By Name', 'Tên người hủy'),
+      t(lang, '作廢原因', 'Void Reason', 'Lý do hủy'),
+      t(lang, '取消人員編號', 'Cancelled By No.', 'Mã người hủy bỏ'),
+      t(lang, '取消人員姓名', 'Cancelled By Name', 'Tên người hủy bỏ'),
+      t(lang, '取消原因', 'Cancel Reason', 'Lý do hủy bỏ'),
+      t(lang, '取消時間', 'Cancelled At', 'Thời gian hủy bỏ'),
+      t(lang, '建立時間', 'Created At', 'Thời gian tạo'),
+      t(lang, '更新時間', 'Updated At', 'Thời gian cập nhật'),
+    ]
     const rows = hrLeaves.map((leave) => [
-  leave.id,
-  leave.employee_no,
-  leave.employee_name,
-  leave.leave_type,
-  leave.start_date,
-  leave.start_time || '',
-  leave.end_date,
-  leave.end_time || '',
-  leave.total_hours ?? '',
-  leave.reason || '',
-  statusText(leave.status, lang),
-  leave.current_approver_no,
-  leave.current_approver_name,
-  leave.voided_by_no || '',
-  leave.voided_by_name || '',
-  leave.void_reason || '',
-  leave.created_at,
-  leave.updated_at,
-])
+      leave.id,
+      leave.employee_no,
+      leave.employee_name,
+      leave.leave_type,
+      leave.start_date,
+      leave.start_time || '',
+      leave.end_date,
+      leave.end_time || '',
+      leave.total_hours ?? '',
+      leave.reason || '',
+      statusText(leave.status, lang),
+      leave.current_approver_no,
+      leave.current_approver_name,
+      leave.voided_by_no || '',
+      leave.voided_by_name || '',
+      leave.void_reason || '',
+      leave.cancelled_by_no || '',
+      leave.cancelled_by_name || '',
+      leave.cancel_reason || '',
+      leave.cancelled_at || '',
+      leave.created_at,
+      leave.updated_at,
+    ])
     downloadCsv(rows, headers, `HR_${t(lang, '請假報表', 'Leave_Report', 'Bao_cao_nghi_phep')}`)
     setHrMessage(t(lang, `已匯出 ${hrLeaves.length} 筆請假報表`, `Exported ${hrLeaves.length} leave record(s)`, `Đã xuất ${hrLeaves.length} bản ghi nghỉ phép`))
   }
@@ -908,20 +971,20 @@ function App() {
       setHrMessage(t(lang, '目前沒有補卡 / 忘刷資料可以匯出', 'No punch correction data to export.', 'Không có dữ liệu chấm công để xuất.'))
       return
     }
-   const headers = [
-  t(lang, '補卡編號', 'ID', 'Mã đơn'),
-  t(lang, '員工編號', 'Employee No.', 'Mã NV'),
-  t(lang, '姓名', 'Name', 'Tên'),
-  t(lang, '補卡類型', 'Punch Type', 'Loại chấm công'),
-  t(lang, '補卡日期', 'Punch Date', 'Ngày chấm công'),
-  t(lang, '補卡時間', 'Punch Time', 'Giờ chấm công'),
-  t(lang, '原因', 'Reason', 'Lý do'),
-  t(lang, '狀態', 'Status', 'Trạng thái'),
-  t(lang, '審核主管編號', 'Approver No.', 'Mã quản lý'),
-  t(lang, '審核主管姓名', 'Approver Name', 'Tên quản lý'),
-  t(lang, '建立時間', 'Created At', 'Thời gian tạo'),
-  t(lang, '更新時間', 'Updated At', 'Thời gian cập nhật'),
-]
+    const headers = [
+      t(lang, '補卡編號', 'ID', 'Mã đơn'),
+      t(lang, '員工編號', 'Employee No.', 'Mã NV'),
+      t(lang, '姓名', 'Name', 'Tên'),
+      t(lang, '補卡類型', 'Punch Type', 'Loại chấm công'),
+      t(lang, '補卡日期', 'Punch Date', 'Ngày chấm công'),
+      t(lang, '補卡時間', 'Punch Time', 'Giờ chấm công'),
+      t(lang, '原因', 'Reason', 'Lý do'),
+      t(lang, '狀態', 'Status', 'Trạng thái'),
+      t(lang, '審核主管編號', 'Approver No.', 'Mã quản lý'),
+      t(lang, '審核主管姓名', 'Approver Name', 'Tên quản lý'),
+      t(lang, '建立時間', 'Created At', 'Thời gian tạo'),
+      t(lang, '更新時間', 'Updated At', 'Thời gian cập nhật'),
+    ]
     const rows = hrPunches.map((punch) => [
       punch.id, punch.employee_no, punch.employee_name, punch.punch_type,
       punch.punch_date, punch.punch_time, punch.reason || '', statusText(punch.status, lang),
@@ -1333,6 +1396,7 @@ function App() {
                 </section>
               )}
 
+              {/* 我的假單區塊（含取消按鈕與取消資訊） */}
               <section className="card result-card">
                 <h2>{t(lang, '我的假單', 'My Leave Requests', 'Đơn nghỉ phép của tôi')}</h2>
                 <button className="submit-btn" type="button" onClick={loadMyLeaves} disabled={isLoadingMyLeaves}>
@@ -1354,7 +1418,25 @@ function App() {
                           <p>{t(lang, '原因', 'Reason', 'Lý do')}：{leave.reason || t(lang, '未填寫', 'N/A', 'Chưa điền')}</p>
                           <p>{t(lang, '審核主管', 'Approver', 'Người duyệt')}：{leave.current_approver_name} / {leave.current_approver_no}</p>
                           <p>{t(lang, '建立時間', 'Created At', 'Thời gian tạo')}：{leave.created_at}</p>
+                          {leave.status === 'cancelled' && (
+                            <>
+                              <p>{t(lang, '取消人員', 'Cancelled By', 'Người hủy bỏ')}：{leave.cancelled_by_name || '-'} / {leave.cancelled_by_no || '-'}</p>
+                              <p>{t(lang, '取消原因', 'Cancel Reason', 'Lý do hủy bỏ')}：{leave.cancel_reason || '-'}</p>
+                              <p>{t(lang, '取消時間', 'Cancelled At', 'Thời gian hủy bỏ')}：{leave.cancelled_at || '-'}</p>
+                            </>
+                          )}
                         </div>
+                        {leave.status === 'pending' && (
+                          <div className="approval-actions">
+                            <button
+                              type="button"
+                              className="reject-btn"
+                              onClick={() => handleCancelLeave(leave.id)}
+                            >
+                              {t(lang, '取消申請', 'Cancel', 'Hủy đơn')}
+                            </button>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -1469,7 +1551,7 @@ function App() {
             </section>
           )}
 
-          {/* ── HR report section（含作廢按鈕與作廢顯示） ── */}
+          {/* ── HR report section（含作廢按鈕與取消資訊） ── */}
           {activeSection === 'hr' && canViewHrReport && (
             <section className="card result-card">
               <h2>{t(lang, 'HR 全部報表', 'All HR Reports', 'Tất cả báo cáo HR')}</h2>
@@ -1513,6 +1595,13 @@ function App() {
                                 <>
                                   <p>{t(lang, '作廢人員', 'Voided By', 'Người hủy')}：{leave.voided_by_name || '-'} / {leave.voided_by_no || '-'}</p>
                                   <p>{t(lang, '作廢原因', 'Void Reason', 'Lý do hủy')}：{leave.void_reason || '-'}</p>
+                                </>
+                              )}
+                              {leave.status === 'cancelled' && (
+                                <>
+                                  <p>{t(lang, '取消人員', 'Cancelled By', 'Người hủy bỏ')}：{leave.cancelled_by_name || '-'} / {leave.cancelled_by_no || '-'}</p>
+                                  <p>{t(lang, '取消原因', 'Cancel Reason', 'Lý do hủy bỏ')}：{leave.cancel_reason || '-'}</p>
+                                  <p>{t(lang, '取消時間', 'Cancelled At', 'Thời gian hủy bỏ')}：{leave.cancelled_at || '-'}</p>
                                 </>
                               )}
                             </div>
