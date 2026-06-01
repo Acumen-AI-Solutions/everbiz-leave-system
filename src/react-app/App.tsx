@@ -59,8 +59,12 @@ type LeaveRecord = {
   total_hours?: number
   reason: string
   status: string
+  approval_stage?: string
   current_approver_no: string
   current_approver_name: string
+  voided_by_no?: string
+  voided_by_name?: string
+  void_reason?: string
   created_at: string
   updated_at: string
 }
@@ -198,6 +202,7 @@ function statusText(status: string, lang: Lang) {
   if (status === 'pending')  return t(lang, '待審核', 'Pending',  'Chờ duyệt')
   if (status === 'approved') return t(lang, '已核准', 'Approved', 'Đã duyệt')
   if (status === 'rejected') return t(lang, '已駁回', 'Rejected', 'Đã từ chối')
+  if (status === 'voided')   return t(lang, '已作廢', 'Voided',   'Đã hủy')
   return status
 }
 
@@ -370,7 +375,6 @@ function App() {
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
-    // 防止連點造成重複送出
     if (isSubmitting) return
 
     const normalizedEmployeeNo = employeeNo.trim().toUpperCase()
@@ -751,6 +755,55 @@ function App() {
       setMyLeaves([])
     } finally {
       setIsLoadingMyLeaves(false)
+    }
+  }
+
+  // ── 作廢假單（HR 專用）──────────────────────────────────────────────────
+  async function handleVoidLeave(leaveId: number) {
+    if (!currentUser) return
+
+    const voidReason = window.prompt(
+      t(lang, '請輸入作廢原因', 'Please enter void reason', 'Vui lòng nhập lý do hủy')
+    )
+
+    if (!voidReason || !voidReason.trim()) {
+      setHrMessage(t(lang, '已取消作廢，未輸入原因', 'Void cancelled: no reason entered', 'Đã hủy thao tác: chưa nhập lý do'))
+      return
+    }
+
+    if (!window.confirm(
+      t(lang,
+        '確定要作廢這張假單嗎？此動作不會刪除資料，但會將狀態改為作廢。',
+        'Are you sure you want to void this leave request? This will not delete the record, only mark it as voided.',
+        'Bạn có chắc muốn hủy đơn nghỉ phép này không? Dữ liệu sẽ không bị xóa, chỉ đổi trạng thái.')
+    )) {
+      return
+    }
+
+    setHrMessage(t(lang, '作廢處理中...', 'Voiding...', 'Đang xử lý hủy...'))
+
+    try {
+      const response = await fetch('/api/leave/void', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          leave_id: leaveId,
+          hr_no: currentUser.employee_no,
+          void_reason: voidReason.trim(),
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!data.ok) {
+        setHrMessage(data.message || t(lang, '作廢失敗', 'Void failed', 'Hủy thất bại'))
+        return
+      }
+
+      setHrMessage(data.message || t(lang, '假單已作廢', 'Leave request voided', 'Đơn nghỉ phép đã bị hủy'))
+      await loadHrReport()
+    } catch {
+      setHrMessage(t(lang, '作廢失敗，請確認 /api/leave/void 是否正常', 'Void failed. Please check /api/leave/void.', 'Hủy thất bại. Vui lòng kiểm tra /api/leave/void.'))
     }
   }
 
@@ -1386,7 +1439,7 @@ function App() {
             </section>
           )}
 
-          {/* ── HR report section ── */}
+          {/* ── HR report section（含作廢按鈕與作廢顯示） ── */}
           {activeSection === 'hr' && canViewHrReport && (
             <section className="card result-card">
               <h2>{t(lang, 'HR 全部報表', 'All HR Reports', 'Tất cả báo cáo HR')}</h2>
@@ -1426,7 +1479,24 @@ function App() {
                               <p>{t(lang, '原因', 'Reason', 'Lý do')}：{leave.reason || t(lang, '未填寫', 'N/A', 'Chưa điền')}</p>
                               <p>{t(lang, '審核主管', 'Approver', 'Người duyệt')}：{leave.current_approver_name} / {leave.current_approver_no}</p>
                               <p>{t(lang, '建立時間', 'Created At', 'Thời gian tạo')}：{leave.created_at}</p>
+                              {leave.status === 'voided' && (
+                                <>
+                                  <p>{t(lang, '作廢人員', 'Voided By', 'Người hủy')}：{leave.voided_by_name || '-'} / {leave.voided_by_no || '-'}</p>
+                                  <p>{t(lang, '作廢原因', 'Void Reason', 'Lý do hủy')}：{leave.void_reason || '-'}</p>
+                                </>
+                              )}
                             </div>
+                            {leave.status !== 'voided' && (
+                              <div className="approval-actions">
+                                <button
+                                  type="button"
+                                  className="reject-btn"
+                                  onClick={() => handleVoidLeave(leave.id)}
+                                >
+                                  {t(lang, '作廢', 'Void', 'Hủy')}
+                                </button>
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>
