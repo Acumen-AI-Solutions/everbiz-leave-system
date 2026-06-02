@@ -102,6 +102,7 @@ type OvertimeRecord = {
 
 type FormType = 'leave' | 'punch' | 'overtime'
 type SectionType = 'form' | 'approvals' | 'hr'
+type RecordTab = 'leave' | 'punch' | 'overtime'
 type Lang = 'zh' | 'en' | 'vi'
 
 function t(lang: Lang, zh: string, en: string, vi: string): string {
@@ -256,6 +257,9 @@ function App() {
   const [pendingOvertimes, setPendingOvertimes] = useState<OvertimeRecord[]>([])
   const [approvalMessage, setApprovalMessage] = useState('')
   const [isLoadingApprovals, setIsLoadingApprovals] = useState(false)
+
+  // My records tab
+  const [activeRecordTab, setActiveRecordTab] = useState<RecordTab>('leave')
 
   // My leaves
   const [myLeaves, setMyLeaves] = useState<LeaveRecord[]>([])
@@ -1121,7 +1125,9 @@ function App() {
                 <section className="card">
                   <h2>{t(lang, '員工資料', 'Employee Data', 'Thông tin nhân viên')}</h2>
                   <table>
-                    <thead><tr><th>{t(lang, '編號', 'No.', 'Mã')}</th><th>{t(lang, '姓名', 'Name', 'Tên')}</th><th>{t(lang, '職稱', 'Position', 'Chức vụ')}</th><th>{t(lang, '部門', 'Department', 'Bộ phận')}</th></tr></thead>
+                    <thead>
+                      <tr><th>{t(lang, '編號', 'No.', 'Mã')}</th><th>{t(lang, '姓名', 'Name', 'Tên')}</th><th>{t(lang, '職稱', 'Position', 'Chức vụ')}</th><th>{t(lang, '部門', 'Department', 'Bộ phận')}</th></tr>
+                    </thead>
                     <tbody>
                       {employeeList.map(emp => (
                         <tr key={emp.employee_no}>
@@ -1151,63 +1157,120 @@ function App() {
                 </section>
               )}
 
+              {/* 我的紀錄（整合式分頁） */}
               <section className="card result-card">
-                <h2>{t(lang, '我的假單', 'My Leave Requests', 'Đơn nghỉ phép của tôi')}</h2>
-                <button className="submit-btn" onClick={loadMyLeaves} disabled={isLoadingMyLeaves}>{isLoadingMyLeaves ? t(lang, '查詢中...', 'Loading...', 'Đang tải...') : t(lang, '查詢我的假單', 'Load My Leave Requests', 'Tải đơn nghỉ phép của tôi')}</button>
-                {myLeaveMessage && <div className="note-box">{myLeaveMessage}</div>}
-                {myLeaves.length === 0 ? <p className="small">{t(lang, '目前沒有請假紀錄。', 'No leave records found.', 'Không có bản ghi nghỉ phép.')}</p> : (
-                  <div className="approval-list">{myLeaves.map(leave => (
-                    <div className="approval-item" key={leave.id}>
-                      <div>
-                        <strong>#{leave.id}｜{leave.leave_type}｜{statusText(leave.status, lang)}</strong>
-                        <p>{t(lang, '日期', 'Date', 'Ngày')}：{leave.start_date} {leave.start_time || ''} ~ {leave.end_date} {leave.end_time || ''}</p>
-                        <p>{t(lang, '時數', 'Hours', 'Số giờ')}：{leave.total_hours ?? '-'} {t(lang, '小時', 'hr(s)', 'giờ')}</p>
-                        <p>{t(lang, '原因', 'Reason', 'Lý do')}：{leave.reason || t(lang, '未填寫', 'N/A', 'Chưa điền')}</p>
-                        <p>{t(lang, '審核主管', 'Approver', 'Người duyệt')}：{leave.current_approver_name} / {leave.current_approver_no}</p>
-                        {leave.status === 'cancelled' && <><p>{t(lang, '取消人員', 'Cancelled By', 'Người hủy bỏ')}：{leave.cancelled_by_name || '-'}</p><p>{t(lang, '取消原因', 'Cancel Reason', 'Lý do hủy bỏ')}：{leave.cancel_reason || '-'}</p><p>{t(lang, '取消時間', 'Cancelled At', 'Thời gian hủy bỏ')}：{leave.cancelled_at || '-'}</p></>}
-                      </div>
-                      {leave.status === 'pending' && <div className="approval-actions"><button className="reject-btn" onClick={() => handleCancelLeave(leave.id)}>{t(lang, '取消申請', 'Cancel', 'Hủy đơn')}</button></div>}
-                    </div>
-                  ))}</div>
-                )}
-              </section>
+                <h2>{t(lang, '我的紀錄', 'My Records', 'Hồ sơ của tôi')}</h2>
 
-              <section className="card result-card">
-                <h2>{t(lang, '我的補卡紀錄', 'My Punch Corrections', 'Lịch sử bổ sung chấm công')}</h2>
-                <button className="submit-btn" onClick={loadMyPunches} disabled={isLoadingMyPunches}>{isLoadingMyPunches ? t(lang, '查詢中...', 'Loading...', 'Đang tải...') : t(lang, '查詢我的補卡', 'Load My Punches', 'Tải đơn chấm công')}</button>
-                {myPunchMessage && <div className="note-box">{myPunchMessage}</div>}
-                {myPunches.length === 0 ? <p className="small">{t(lang, '目前沒有補卡紀錄。', 'No punch correction records.', 'Không có bản ghi chấm công.')}</p> : (
-                  <div className="approval-list">{myPunches.map(punch => (
-                    <div className="approval-item" key={punch.id}>
-                      <div>
-                        <strong>#{punch.id}｜{punch.punch_type}｜{statusText(punch.status, lang)}</strong>
-                        <p>{punch.punch_date} {punch.punch_time}</p>
-                        <p>{t(lang, '原因', 'Reason', 'Lý do')}：{punch.reason || t(lang, '未填寫', 'N/A', 'Chưa điền')}</p>
-                        <p>{t(lang, '審核主管', 'Approver', 'Người duyệt')}：{punch.current_approver_name} / {punch.current_approver_no}</p>
-                        <p>{t(lang, '建立時間', 'Created At', 'Thời gian tạo')}：{punch.created_at}</p>
-                      </div>
-                    </div>
-                  ))}</div>
-                )}
-              </section>
+                <div className="form-tabs">
+                  <button
+                    type="button"
+                    className={activeRecordTab === 'leave' ? 'active' : ''}
+                    onClick={() => setActiveRecordTab('leave')}
+                  >
+                    {t(lang, '請假紀錄', 'Leave Records', 'Lịch sử nghỉ phép')}
+                  </button>
+                  <button
+                    type="button"
+                    className={activeRecordTab === 'punch' ? 'active' : ''}
+                    onClick={() => setActiveRecordTab('punch')}
+                  >
+                    {t(lang, '補卡紀錄', 'Punch Records', 'Lịch sử chấm công')}
+                  </button>
+                  <button
+                    type="button"
+                    className={activeRecordTab === 'overtime' ? 'active' : ''}
+                    onClick={() => setActiveRecordTab('overtime')}
+                  >
+                    {t(lang, '加班紀錄', 'Overtime Records', 'Lịch sử tăng ca')}
+                  </button>
+                </div>
 
-              <section className="card result-card">
-                <h2>{t(lang, '我的加班紀錄', 'My Overtime Requests', 'Lịch sử tăng ca')}</h2>
-                <button className="submit-btn" onClick={loadMyOvertimes} disabled={isLoadingMyOvertimes}>{isLoadingMyOvertimes ? t(lang, '查詢中...', 'Loading...', 'Đang tải...') : t(lang, '查詢我的加班', 'Load My Overtimes', 'Tải đơn tăng ca')}</button>
-                {myOvertimeMessage && <div className="note-box">{myOvertimeMessage}</div>}
-                {myOvertimes.length === 0 ? <p className="small">{t(lang, '目前沒有加班紀錄。', 'No overtime records.', 'Không có bản ghi tăng ca.')}</p> : (
-                  <div className="approval-list">{myOvertimes.map(ot => (
-                    <div className="approval-item" key={ot.id}>
-                      <div>
-                        <strong>#{ot.id}｜{ot.overtime_type}｜{statusText(ot.status, lang)}</strong>
-                        <p>{ot.overtime_date} {ot.start_time} ~ {ot.end_time}</p>
-                        <p>{t(lang, '時數', 'Hours', 'Số giờ')}：{ot.total_hours} {t(lang, '小時', 'hr(s)', 'giờ')}</p>
-                        <p>{t(lang, '原因', 'Reason', 'Lý do')}：{ot.reason || t(lang, '未填寫', 'N/A', 'Chưa điền')}</p>
-                        <p>{t(lang, '審核主管', 'Approver', 'Người duyệt')}：{ot.current_approver_name} / {ot.current_approver_no}</p>
-                        <p>{t(lang, '建立時間', 'Created At', 'Thời gian tạo')}：{ot.created_at}</p>
+                {activeRecordTab === 'leave' && (
+                  <>
+                    <button className="submit-btn" onClick={loadMyLeaves} disabled={isLoadingMyLeaves}>
+                      {isLoadingMyLeaves ? t(lang, '查詢中...', 'Loading...', 'Đang tải...') : t(lang, '查詢我的假單', 'Load My Leave Requests', 'Tải đơn nghỉ phép của tôi')}
+                    </button>
+                    {myLeaveMessage && <div className="note-box">{myLeaveMessage}</div>}
+                    {myLeaves.length === 0 ? (
+                      <p className="small">{t(lang, '目前沒有請假紀錄。', 'No leave records found.', 'Không có bản ghi nghỉ phép.')}</p>
+                    ) : (
+                      <div className="approval-list">
+                        {myLeaves.map(leave => (
+                          <div className="approval-item" key={leave.id}>
+                            <div>
+                              <strong>#{leave.id}｜{leave.leave_type}｜{statusText(leave.status, lang)}</strong>
+                              <p>{t(lang, '日期', 'Date', 'Ngày')}：{leave.start_date} {leave.start_time || ''} ~ {leave.end_date} {leave.end_time || ''}</p>
+                              <p>{t(lang, '時數', 'Hours', 'Số giờ')}：{leave.total_hours ?? '-'} {t(lang, '小時', 'hr(s)', 'giờ')}</p>
+                              <p>{t(lang, '原因', 'Reason', 'Lý do')}：{leave.reason || t(lang, '未填寫', 'N/A', 'Chưa điền')}</p>
+                              <p>{t(lang, '審核主管', 'Approver', 'Người duyệt')}：{leave.current_approver_name} / {leave.current_approver_no}</p>
+                              <p>{t(lang, '建立時間', 'Created At', 'Thời gian tạo')}：{leave.created_at}</p>
+                            </div>
+                            {leave.status === 'pending' && (
+                              <div className="approval-actions">
+                                <button className="reject-btn" onClick={() => handleCancelLeave(leave.id)}>
+                                  {t(lang, '取消申請', 'Cancel', 'Hủy đơn')}
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        ))}
                       </div>
-                    </div>
-                  ))}</div>
+                    )}
+                  </>
+                )}
+
+                {activeRecordTab === 'punch' && (
+                  <>
+                    <button className="submit-btn" onClick={loadMyPunches} disabled={isLoadingMyPunches}>
+                      {isLoadingMyPunches ? t(lang, '查詢中...', 'Loading...', 'Đang tải...') : t(lang, '查詢我的補卡', 'Load My Punches', 'Tải đơn chấm công')}
+                    </button>
+                    {myPunchMessage && <div className="note-box">{myPunchMessage}</div>}
+                    {myPunches.length === 0 ? (
+                      <p className="small">{t(lang, '目前沒有補卡紀錄。', 'No punch correction records.', 'Không có bản ghi chấm công.')}</p>
+                    ) : (
+                      <div className="approval-list">
+                        {myPunches.map(punch => (
+                          <div className="approval-item" key={punch.id}>
+                            <div>
+                              <strong>#{punch.id}｜{punch.punch_type}｜{statusText(punch.status, lang)}</strong>
+                              <p>{t(lang, '補卡時間', 'Punch Time', 'Giờ chấm công')}：{punch.punch_date} {punch.punch_time}</p>
+                              <p>{t(lang, '原因', 'Reason', 'Lý do')}：{punch.reason || t(lang, '未填寫', 'N/A', 'Chưa điền')}</p>
+                              <p>{t(lang, '審核主管', 'Approver', 'Người duyệt')}：{punch.current_approver_name} / {punch.current_approver_no}</p>
+                              <p>{t(lang, '建立時間', 'Created At', 'Thời gian tạo')}：{punch.created_at}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {activeRecordTab === 'overtime' && (
+                  <>
+                    <button className="submit-btn" onClick={loadMyOvertimes} disabled={isLoadingMyOvertimes}>
+                      {isLoadingMyOvertimes ? t(lang, '查詢中...', 'Loading...', 'Đang tải...') : t(lang, '查詢我的加班', 'Load My Overtime', 'Tải đơn tăng ca')}
+                    </button>
+                    {myOvertimeMessage && <div className="note-box">{myOvertimeMessage}</div>}
+                    {myOvertimes.length === 0 ? (
+                      <p className="small">{t(lang, '目前沒有加班紀錄。', 'No overtime records.', 'Không có bản ghi tăng ca.')}</p>
+                    ) : (
+                      <div className="approval-list">
+                        {myOvertimes.map(overtime => (
+                          <div className="approval-item" key={overtime.id}>
+                            <div>
+                              <strong>#{overtime.id}｜{overtime.overtime_type}｜{statusText(overtime.status, lang)}</strong>
+                              <p>{t(lang, '加班日期', 'Overtime Date', 'Ngày tăng ca')}：{overtime.overtime_date}</p>
+                              <p>{t(lang, '時間', 'Time', 'Thời gian')}：{overtime.start_time} ~ {overtime.end_time}</p>
+                              <p>{t(lang, '時數', 'Hours', 'Số giờ')}：{overtime.total_hours} {t(lang, '小時', 'hr(s)', 'giờ')}</p>
+                              <p>{t(lang, '原因', 'Reason', 'Lý do')}：{overtime.reason || t(lang, '未填寫', 'N/A', 'Chưa điền')}</p>
+                              <p>{t(lang, '審核主管', 'Approver', 'Người duyệt')}：{overtime.current_approver_name} / {overtime.current_approver_no}</p>
+                              <p>{t(lang, '建立時間', 'Created At', 'Thời gian tạo')}：{overtime.created_at}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
                 )}
               </section>
             </>
@@ -1226,34 +1289,40 @@ function App() {
               {pendingLeaves.length > 0 && (
                 <>
                   <h3>{t(lang, '待審核假單', 'Pending Leave Requests', 'Đơn nghỉ phép chờ duyệt')}</h3>
-                  <div className="approval-list">{pendingLeaves.map(leave => (
-                    <div className="approval-item" key={leave.id}>
-                      <div><strong>#{leave.id}｜{leave.employee_no} {leave.employee_name}</strong><p>{leave.leave_type}｜{leave.start_date} {leave.start_time || ''} ~ {leave.end_date} {leave.end_time || ''}</p><p>{t(lang, '時數', 'Hours', 'Số giờ')}：{leave.total_hours ?? '-'} {t(lang, '小時', 'hr(s)', 'giờ')}</p><p>{t(lang, '原因', 'Reason', 'Lý do')}：{leave.reason || t(lang, '未填寫', 'N/A', 'Chưa điền')}</p></div>
-                      <div className="approval-actions"><button className="approve-btn" onClick={() => handleApprovalAction(leave.id, 'approved')}>{t(lang, '核准', 'Approve', 'Duyệt')}</button><button className="reject-btn" onClick={() => handleApprovalAction(leave.id, 'rejected')}>{t(lang, '駁回', 'Reject', 'Từ chối')}</button></div>
-                    </div>
-                  ))}</div>
+                  <div className="approval-list">
+                    {pendingLeaves.map(leave => (
+                      <div className="approval-item" key={leave.id}>
+                        <div><strong>#{leave.id}｜{leave.employee_no} {leave.employee_name}</strong><p>{leave.leave_type}｜{leave.start_date} {leave.start_time || ''} ~ {leave.end_date} {leave.end_time || ''}</p><p>{t(lang, '時數', 'Hours', 'Số giờ')}：{leave.total_hours ?? '-'} {t(lang, '小時', 'hr(s)', 'giờ')}</p><p>{t(lang, '原因', 'Reason', 'Lý do')}：{leave.reason || t(lang, '未填寫', 'N/A', 'Chưa điền')}</p></div>
+                        <div className="approval-actions"><button className="approve-btn" onClick={() => handleApprovalAction(leave.id, 'approved')}>{t(lang, '核准', 'Approve', 'Duyệt')}</button><button className="reject-btn" onClick={() => handleApprovalAction(leave.id, 'rejected')}>{t(lang, '駁回', 'Reject', 'Từ chối')}</button></div>
+                      </div>
+                    ))}
+                  </div>
                 </>
               )}
               {pendingPunches.length > 0 && (
                 <>
                   <h3>{t(lang, '待審核補卡', 'Pending Punch Corrections', 'Đơn chấm công chờ duyệt')}</h3>
-                  <div className="approval-list">{pendingPunches.map(punch => (
-                    <div className="approval-item" key={`punch-${punch.id}`}>
-                      <div><strong>{t(lang, '補卡', 'Punch', 'Chấm công')} #{punch.id}｜{punch.employee_no} {punch.employee_name}</strong><p>{punch.punch_type}｜{punch.punch_date} {punch.punch_time}</p><p>{t(lang, '原因', 'Reason', 'Lý do')}：{punch.reason || t(lang, '未填寫', 'N/A', 'Chưa điền')}</p><p>{t(lang, '建立時間', 'Created At', 'Thời gian tạo')}：{punch.created_at}</p></div>
-                      <div className="approval-actions"><button className="approve-btn" onClick={() => handlePunchApprovalAction(punch.id, 'approved')}>{t(lang, '核准', 'Approve', 'Duyệt')}</button><button className="reject-btn" onClick={() => handlePunchApprovalAction(punch.id, 'rejected')}>{t(lang, '駁回', 'Reject', 'Từ chối')}</button></div>
-                    </div>
-                  ))}</div>
+                  <div className="approval-list">
+                    {pendingPunches.map(punch => (
+                      <div className="approval-item" key={`punch-${punch.id}`}>
+                        <div><strong>{t(lang, '補卡', 'Punch', 'Chấm công')} #{punch.id}｜{punch.employee_no} {punch.employee_name}</strong><p>{punch.punch_type}｜{punch.punch_date} {punch.punch_time}</p><p>{t(lang, '原因', 'Reason', 'Lý do')}：{punch.reason || t(lang, '未填寫', 'N/A', 'Chưa điền')}</p><p>{t(lang, '建立時間', 'Created At', 'Thời gian tạo')}：{punch.created_at}</p></div>
+                        <div className="approval-actions"><button className="approve-btn" onClick={() => handlePunchApprovalAction(punch.id, 'approved')}>{t(lang, '核准', 'Approve', 'Duyệt')}</button><button className="reject-btn" onClick={() => handlePunchApprovalAction(punch.id, 'rejected')}>{t(lang, '駁回', 'Reject', 'Từ chối')}</button></div>
+                      </div>
+                    ))}
+                  </div>
                 </>
               )}
               {pendingOvertimes.length > 0 && (
                 <>
                   <h3>{t(lang, '待審核加班', 'Pending Overtime Requests', 'Đơn tăng ca chờ duyệt')}</h3>
-                  <div className="approval-list">{pendingOvertimes.map(ot => (
-                    <div className="approval-item" key={`ot-${ot.id}`}>
-                      <div><strong>{t(lang, '加班', 'OT', 'Tăng ca')} #{ot.id}｜{ot.employee_no} {ot.employee_name}</strong><p>{ot.overtime_type}｜{ot.overtime_date} {ot.start_time}~{ot.end_time}</p><p>{t(lang, '時數', 'Hours', 'Số giờ')}：{ot.total_hours ?? '-'} {t(lang, '小時', 'hr(s)', 'giờ')}</p><p>{t(lang, '原因', 'Reason', 'Lý do')}：{ot.reason || t(lang, '未填寫', 'N/A', 'Chưa điền')}</p></div>
-                      <div className="approval-actions"><button className="approve-btn" onClick={() => handleOvertimeApprovalAction(ot.id, 'approved')}>{t(lang, '核准', 'Approve', 'Duyệt')}</button><button className="reject-btn" onClick={() => handleOvertimeApprovalAction(ot.id, 'rejected')}>{t(lang, '駁回', 'Reject', 'Từ chối')}</button></div>
-                    </div>
-                  ))}</div>
+                  <div className="approval-list">
+                    {pendingOvertimes.map(ot => (
+                      <div className="approval-item" key={`ot-${ot.id}`}>
+                        <div><strong>{t(lang, '加班', 'OT', 'Tăng ca')} #{ot.id}｜{ot.employee_no} {ot.employee_name}</strong><p>{ot.overtime_type}｜{ot.overtime_date} {ot.start_time}~{ot.end_time}</p><p>{t(lang, '時數', 'Hours', 'Số giờ')}：{ot.total_hours ?? '-'} {t(lang, '小時', 'hr(s)', 'giờ')}</p><p>{t(lang, '原因', 'Reason', 'Lý do')}：{ot.reason || t(lang, '未填寫', 'N/A', 'Chưa điền')}</p></div>
+                        <div className="approval-actions"><button className="approve-btn" onClick={() => handleOvertimeApprovalAction(ot.id, 'approved')}>{t(lang, '核准', 'Approve', 'Duyệt')}</button><button className="reject-btn" onClick={() => handleOvertimeApprovalAction(ot.id, 'rejected')}>{t(lang, '駁回', 'Reject', 'Từ chối')}</button></div>
+                      </div>
+                    ))}
+                  </div>
                 </>
               )}
             </section>
@@ -1271,22 +1340,28 @@ function App() {
               {hrMessage && <div className="note-box">{hrMessage}</div>}
               {hrLeaves.length === 0 && hrPunches.length === 0 && hrOvertimes.length === 0 ? <p className="small">{t(lang, '目前沒有 HR 報表資料。', 'No HR report records found.', 'Không có dữ liệu báo cáo HR.')}</p> : (
                 <>
-                  {hrLeaves.length > 0 && <><h3>{t(lang, '請假報表', 'Leave Report', 'Báo cáo nghỉ phép')}</h3><div className="approval-list">{hrLeaves.map(leave => (
-                    <div className="approval-item" key={`hr-leave-${leave.id}`}>
-                      <div><strong>#{leave.id}｜{leave.employee_no} {leave.employee_name}｜{statusText(leave.status, lang)}</strong><p>{leave.leave_type}｜{leave.start_date} {leave.start_time || ''} ~ {leave.end_date} {leave.end_time || ''}</p><p>{t(lang, '時數', 'Hours', 'Số giờ')}：{leave.total_hours ?? '-'} {t(lang, '小時', 'hr(s)', 'giờ')}</p><p>{t(lang, '原因', 'Reason', 'Lý do')}：{leave.reason || t(lang, '未填寫', 'N/A', 'Chưa điền')}</p><p>{t(lang, '審核主管', 'Approver', 'Người duyệt')}：{leave.current_approver_name} / {leave.current_approver_no}</p><p>{t(lang, '建立時間', 'Created At', 'Thời gian tạo')}：{leave.created_at}</p>{leave.status === 'voided' && <><p>{t(lang, '作廢人員', 'Voided By', 'Người hủy')}：{leave.voided_by_name || '-'}</p><p>{t(lang, '作廢原因', 'Void Reason', 'Lý do hủy')}：{leave.void_reason || '-'}</p></>}{leave.status === 'cancelled' && <><p>{t(lang, '取消人員', 'Cancelled By', 'Người hủy bỏ')}：{leave.cancelled_by_name || '-'}</p><p>{t(lang, '取消原因', 'Cancel Reason', 'Lý do hủy bỏ')}：{leave.cancel_reason || '-'}</p><p>{t(lang, '取消時間', 'Cancelled At', 'Thời gian hủy bỏ')}：{leave.cancelled_at || '-'}</p></>}</div>
-                      {leave.status !== 'voided' && <div className="approval-actions"><button className="reject-btn" onClick={() => handleVoidLeave(leave.id)}>{t(lang, '作廢', 'Void', 'Hủy')}</button></div>}
-                    </div>
-                  ))}</div></>}
-                  {hrPunches.length > 0 && <><h3>{t(lang, '補卡 / 忘刷報表', 'Punch Correction Report', 'Báo cáo bổ sung chấm công')}</h3><div className="approval-list">{hrPunches.map(punch => (
-                    <div className="approval-item" key={`hr-punch-${punch.id}`}>
-                      <div><strong>#{punch.id}｜{punch.employee_no} {punch.employee_name}｜{statusText(punch.status, lang)}</strong><p>{punch.punch_type}｜{punch.punch_date} {punch.punch_time}</p><p>{t(lang, '原因', 'Reason', 'Lý do')}：{punch.reason || t(lang, '未填寫', 'N/A', 'Chưa điền')}</p><p>{t(lang, '審核主管', 'Approver', 'Người duyệt')}：{punch.current_approver_name} / {punch.current_approver_no}</p><p>{t(lang, '建立時間', 'Created At', 'Thời gian tạo')}：{punch.created_at}</p></div>
-                    </div>
-                  ))}</div></>}
-                  {hrOvertimes.length > 0 && <><h3>{t(lang, '加班報表', 'Overtime Report', 'Báo cáo tăng ca')}</h3><div className="approval-list">{hrOvertimes.map(ot => (
-                    <div className="approval-item" key={`hr-ot-${ot.id}`}>
-                      <div><strong>#{ot.id}｜{ot.employee_no} {ot.employee_name}｜{statusText(ot.status, lang)}</strong><p>{ot.overtime_type}｜{ot.overtime_date} {ot.start_time}~{ot.end_time}</p><p>{t(lang, '時數', 'Hours', 'Số giờ')}：{ot.total_hours ?? '-'} {t(lang, '小時', 'hr(s)', 'giờ')}</p><p>{t(lang, '原因', 'Reason', 'Lý do')}：{ot.reason || t(lang, '未填寫', 'N/A', 'Chưa điền')}</p><p>{t(lang, '審核主管', 'Approver', 'Người duyệt')}：{ot.current_approver_name} / {ot.current_approver_no}</p><p>{t(lang, '建立時間', 'Created At', 'Thời gian tạo')}：{ot.created_at}</p></div>
-                    </div>
-                  ))}</div></>}
+                  {hrLeaves.length > 0 && <><h3>{t(lang, '請假報表', 'Leave Report', 'Báo cáo nghỉ phép')}</h3><div className="approval-list">
+                    {hrLeaves.map(leave => (
+                      <div className="approval-item" key={`hr-leave-${leave.id}`}>
+                        <div><strong>#{leave.id}｜{leave.employee_no} {leave.employee_name}｜{statusText(leave.status, lang)}</strong><p>{leave.leave_type}｜{leave.start_date} {leave.start_time || ''} ~ {leave.end_date} {leave.end_time || ''}</p><p>{t(lang, '時數', 'Hours', 'Số giờ')}：{leave.total_hours ?? '-'} {t(lang, '小時', 'hr(s)', 'giờ')}</p><p>{t(lang, '原因', 'Reason', 'Lý do')}：{leave.reason || t(lang, '未填寫', 'N/A', 'Chưa điền')}</p><p>{t(lang, '審核主管', 'Approver', 'Người duyệt')}：{leave.current_approver_name} / {leave.current_approver_no}</p><p>{t(lang, '建立時間', 'Created At', 'Thời gian tạo')}：{leave.created_at}</p>{leave.status === 'voided' && <><p>{t(lang, '作廢人員', 'Voided By', 'Người hủy')}：{leave.voided_by_name || '-'}</p><p>{t(lang, '作廢原因', 'Void Reason', 'Lý do hủy')}：{leave.void_reason || '-'}</p></>}{leave.status === 'cancelled' && <><p>{t(lang, '取消人員', 'Cancelled By', 'Người hủy bỏ')}：{leave.cancelled_by_name || '-'}</p><p>{t(lang, '取消原因', 'Cancel Reason', 'Lý do hủy bỏ')}：{leave.cancel_reason || '-'}</p><p>{t(lang, '取消時間', 'Cancelled At', 'Thời gian hủy bỏ')}：{leave.cancelled_at || '-'}</p></>}</div>
+                        {leave.status !== 'voided' && <div className="approval-actions"><button className="reject-btn" onClick={() => handleVoidLeave(leave.id)}>{t(lang, '作廢', 'Void', 'Hủy')}</button></div>}
+                      </div>
+                    ))}
+                  </div></>}
+                  {hrPunches.length > 0 && <><h3>{t(lang, '補卡 / 忘刷報表', 'Punch Correction Report', 'Báo cáo bổ sung chấm công')}</h3><div className="approval-list">
+                    {hrPunches.map(punch => (
+                      <div className="approval-item" key={`hr-punch-${punch.id}`}>
+                        <div><strong>#{punch.id}｜{punch.employee_no} {punch.employee_name}｜{statusText(punch.status, lang)}</strong><p>{punch.punch_type}｜{punch.punch_date} {punch.punch_time}</p><p>{t(lang, '原因', 'Reason', 'Lý do')}：{punch.reason || t(lang, '未填寫', 'N/A', 'Chưa điền')}</p><p>{t(lang, '審核主管', 'Approver', 'Người duyệt')}：{punch.current_approver_name} / {punch.current_approver_no}</p><p>{t(lang, '建立時間', 'Created At', 'Thời gian tạo')}：{punch.created_at}</p></div>
+                      </div>
+                    ))}
+                  </div></>}
+                  {hrOvertimes.length > 0 && <><h3>{t(lang, '加班報表', 'Overtime Report', 'Báo cáo tăng ca')}</h3><div className="approval-list">
+                    {hrOvertimes.map(ot => (
+                      <div className="approval-item" key={`hr-ot-${ot.id}`}>
+                        <div><strong>#{ot.id}｜{ot.employee_no} {ot.employee_name}｜{statusText(ot.status, lang)}</strong><p>{ot.overtime_type}｜{ot.overtime_date} {ot.start_time}~{ot.end_time}</p><p>{t(lang, '時數', 'Hours', 'Số giờ')}：{ot.total_hours ?? '-'} {t(lang, '小時', 'hr(s)', 'giờ')}</p><p>{t(lang, '原因', 'Reason', 'Lý do')}：{ot.reason || t(lang, '未填寫', 'N/A', 'Chưa điền')}</p><p>{t(lang, '審核主管', 'Approver', 'Người duyệt')}：{ot.current_approver_name} / {ot.current_approver_no}</p><p>{t(lang, '建立時間', 'Created At', 'Thời gian tạo')}：{ot.created_at}</p></div>
+                      </div>
+                    ))}
+                  </div></>}
                 </>
               )}
             </section>
