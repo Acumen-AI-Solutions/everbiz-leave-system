@@ -65,6 +65,15 @@ function determineSystemRole(employeeNo, rankType, positionTitle, hrNo) {
   return 'employee'
 }
 
+// 檢查呼叫者是否為人資（用於管理端 API）
+async function isHr(env, hrNo) {
+  if (!hrNo) return false
+  const user = await getEmployee(env.DB, hrNo)
+  if (!user) return false
+  const role = determineSystemRole(hrNo, user.rank_type, user.position_title, getHrNo(env))
+  return role === 'hr'
+}
+
 // ========== 路由處理 ==========
 async function handleRequest(request, env) {
   const url = new URL(request.url)
@@ -119,7 +128,7 @@ async function handleRequest(request, env) {
     })
   }
 
-  // ----- 員工列表 -----
+  // ----- 員工列表（一般使用者，僅列出 active 員工）-----
   if (method === 'GET' && path === '/api/employees') {
     const result = await env.DB.prepare(`
       SELECT
@@ -136,6 +145,128 @@ async function handleRequest(request, env) {
       ORDER BY employee_no ASC
     `).all()
     return jsonResponse({ ok: true, employees: result.results || [] })
+  }
+
+  // ========== HR 管理專用 API（限人資） ==========
+  // 1. 取得所有員工（含停用）
+  if (method === 'GET' && path === '/api/hr/employees') {
+    const hrNo = url.searchParams.get('hr_no')
+    if (!hrNo) return jsonResponse({ ok: false, message: '缺少 hr_no' }, 400)
+    if (!(await isHr(env, hrNo))) {
+      return jsonResponse({ ok: false, message: '無權限，僅人資可操作' }, 403)
+    }
+    const result = await env.DB.prepare(`
+      SELECT
+        employee_no,
+        employee_name,
+        department_name,
+        position_title,
+        rank_type,
+        direct_manager_no,
+        direct_manager_name,
+        pin_code,
+        is_active,
+        created_at,
+        updated_at
+      FROM employees
+      ORDER BY employee_no ASC
+    `).all()
+    return jsonResponse({ ok: true, employees: result.results || [] })
+  }
+
+  // 2. 新增或更新員工
+  if (method === 'POST' && path === '/api/hr/employee/upsert') {
+    const body = await request.json()
+    const hrNo = body.hr_no
+    if (!hrNo) return jsonResponse({ ok: false, message: '缺少 hr_no' }, 400)
+    if (!(await isHr(env, hrNo))) {
+      return jsonResponse({ ok: false, message: '無權限，僅人資可操作' }, 403)
+    }
+
+    const employeeNo = String(body.employee_no || '').trim().toUpperCase()
+    const employeeName = String(body.employee_name || '').trim()
+    const departmentName = String(body.department_name || '').trim()
+    const positionTitle = String(body.position_title || '').trim()
+    const rankType = String(body.rank_type || '').trim()
+    const directManagerNo = String(body.direct_manager_no || '').trim().toUpperCase() || null
+    const directManagerName = String(body.direct_manager_name || '').trim() || null
+    const pinCode = String(body.pin_code || '').trim() || employeeNo // 預設 PIN = 員工編號
+    const isActive = body.is_active === undefined ? 1 : (body.is_active ? 1 : 0)
+
+    if (!employeeNo || !employeeName) {
+      return jsonResponse({ ok: false, message: '員工編號與姓名為必填' }, 400)
+    }
+
+    const now = getTaiwanTimeString()
+    // 檢查是否已存在
+    const existing = await env.DB.prepare(`
+      SELECT employee_no FROM employees WHERE employee_no = ?
+    `).bind(employeeNo).first()
+
+    if (existing) {
+      // 更新
+      await env.DB.prepare(`
+        UPDATE employees
+        SET
+          employee_name = ?,
+          department_name = ?,
+          position_title = ?,
+          rank_type = ?,
+          direct_manager_no = ?,
+          direct_manager_name = ?,
+          pin_code = ?,
+          is_active = ?,
+          updated_at = ?
+        WHERE employee_no = ?
+      `).bind(
+        employeeName, departmentName, positionTitle, rankType,
+        directManagerNo, directManagerName, pinCode, isActive, now, employeeNo
+      ).run()
+      return jsonResponse({ ok: true, message: '員工資料已更新', employee_no: employeeNo })
+    } else {
+      // 新增
+      await env.DB.prepare(`
+        INSERT INTO employees (
+          employee_no, employee_name, department_name, position_title, rank_type,
+          direct_manager_no, direct_manager_name, pin_code, is_active, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        employeeNo, employeeName, departmentName, positionTitle, rankType,
+        directManagerNo, directManagerName, pinCode, isActive, now, now
+      ).run()
+      return jsonResponse({ ok: true, message: '員工已新增', employee_no: employeeNo })
+    }
+  }
+
+  // 3. 停用員工（軟刪除，設 is_active = 0）
+  if (method === 'POST' && path === '/api/hr/employee/deactivate') {
+    const body = await request.json()
+    const hrNo = body.hr_no
+    if (!hrNo) return jsonResponse({ ok: false, message: '缺少 hr_no' }, 400)
+    if (!(await isHr(env, hrNo))) {
+      return jsonResponse({ ok: false, message: '無權限，僅人資可操作' }, 403)
+    }
+
+    const employeeNo = String(body.employee_no || '').trim().toUpperCase()
+    if (!employeeNo) return jsonResponse({ ok: false, message: '缺少 employee_no' }, 400)
+
+    const existing = await env.DB.prepare(`
+      SELECT is_active FROM employees WHERE employee_no = ?
+    `).bind(employeeNo).first()
+    if (!existing) {
+      return jsonResponse({ ok: false, message: '查無此員工' }, 404)
+    }
+    if (existing.is_active === 0) {
+      return jsonResponse({ ok: false, message: '員工已是停用狀態' }, 400)
+    }
+
+    const now = getTaiwanTimeString()
+    await env.DB.prepare(`
+      UPDATE employees
+      SET is_active = 0, updated_at = ?
+      WHERE employee_no = ?
+    `).bind(now, employeeNo).run()
+    return jsonResponse({ ok: true, message: '員工已停用', employee_no: employeeNo })
   }
 
   // ----- 請假申請（三天以上送董事長）-----
@@ -458,7 +589,7 @@ async function handleRequest(request, env) {
     return jsonResponse({ ok: false, message: '未知的審核階段' }, 400)
   }
 
-  // ----- 取消假單 -----
+  // ----- 取消假單（申請人取消自己的待審核假單）-----
   if (method === 'POST' && path === '/api/leave/cancel') {
     const body = await request.json()
     const leaveId = Number(body.leave_id || 0)
@@ -486,7 +617,7 @@ async function handleRequest(request, env) {
     return jsonResponse({ ok: true, message: '假單已取消' })
   }
 
-  // ----- 作廢假單（HR）-----
+  // ----- 作廢假單（HR 專用）-----
   if (method === 'POST' && path === '/api/leave/void') {
     const body = await request.json()
     const leaveId = Number(body.leave_id || 0)
