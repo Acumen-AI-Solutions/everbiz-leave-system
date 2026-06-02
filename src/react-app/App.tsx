@@ -1,6 +1,11 @@
 import { useState, useEffect } from 'react'
 import './App.css'
 
+const API_BASE =
+  window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'https://everbiz-leave-system.imd13.workers.dev'
+    : ''
+
 type Employee = {
   employee_no: string
   employee_name: string
@@ -10,6 +15,25 @@ type Employee = {
   direct_manager_no: string
   direct_manager_name: string
   is_active: number
+}
+
+// 完整員工資料（HR 使用，含代理人、PIN 等）
+type FullEmployee = {
+  employee_no: string
+  employee_name: string
+  department_name: string
+  position_title: string
+  rank_type: string
+  direct_manager_no: string | null
+  direct_manager_name: string | null
+  first_proxy_no: string | null
+  first_proxy_name: string | null
+  second_proxy_no: string | null
+  second_proxy_name: string | null
+  pin_code: string
+  is_active: number
+  created_at: string
+  updated_at: string
 }
 
 type CurrentUser = {
@@ -101,7 +125,7 @@ type OvertimeRecord = {
 }
 
 type FormType = 'leave' | 'punch' | 'overtime'
-type SectionType = 'form' | 'approvals' | 'hr'
+type SectionType = 'form' | 'approvals' | 'hr' | 'employees'
 type RecordTab = 'leave' | 'punch' | 'overtime'
 type Lang = 'zh' | 'en' | 'vi'
 
@@ -221,6 +245,28 @@ function App() {
 
   const [employeeList, setEmployeeList] = useState<Employee[]>([])
 
+  // HR 員工管理專用
+  const [hrEmployees, setHrEmployees] = useState<FullEmployee[]>([])
+  const [hrEmployeeMessage, setHrEmployeeMessage] = useState('')
+  const [isLoadingHrEmployees, setIsLoadingHrEmployees] = useState(false)
+  const [showEmployeeForm, setShowEmployeeForm] = useState(false)
+  const [editingEmployee, setEditingEmployee] = useState<FullEmployee | null>(null)
+  const [employeeFormData, setEmployeeFormData] = useState({
+    employee_no: '',
+    employee_name: '',
+    department_name: '',
+    position_title: '',
+    rank_type: '',
+    direct_manager_no: '',
+    direct_manager_name: '',
+    first_proxy_no: '',
+    first_proxy_name: '',
+    second_proxy_no: '',
+    second_proxy_name: '',
+    pin_code: '',
+    is_active: 1
+  })
+
   // Leave form
   const [employeeNo, setEmployeeNo] = useState('')
   const [employeeName, setEmployeeName] = useState('')
@@ -293,9 +339,136 @@ function App() {
     currentUser?.system_role === 'general_manager' ||
     currentUser?.system_role === 'finance'
 
+  const canManageEmployees =
+    currentUser?.system_role === 'hr' ||
+    currentUser?.system_role === 'general_manager'
+
+  // ----- HR 員工管理函數 -----
+  function resetEmployeeForm() {
+    setEmployeeFormData({
+      employee_no: '',
+      employee_name: '',
+      department_name: '',
+      position_title: '',
+      rank_type: '',
+      direct_manager_no: '',
+      direct_manager_name: '',
+      first_proxy_no: '',
+      first_proxy_name: '',
+      second_proxy_no: '',
+      second_proxy_name: '',
+      pin_code: '',
+      is_active: 1
+    })
+    setEditingEmployee(null)
+    setShowEmployeeForm(false)
+  }
+
+  function editEmployee(emp: FullEmployee) {
+    setEditingEmployee(emp)
+    setEmployeeFormData({
+      employee_no: emp.employee_no,
+      employee_name: emp.employee_name,
+      department_name: emp.department_name || '',
+      position_title: emp.position_title || '',
+      rank_type: emp.rank_type || '',
+      direct_manager_no: emp.direct_manager_no || '',
+      direct_manager_name: emp.direct_manager_name || '',
+      first_proxy_no: emp.first_proxy_no || '',
+      first_proxy_name: emp.first_proxy_name || '',
+      second_proxy_no: emp.second_proxy_no || '',
+      second_proxy_name: emp.second_proxy_name || '',
+      pin_code: emp.pin_code || '',
+      is_active: emp.is_active
+    })
+    setShowEmployeeForm(true)
+  }
+
+  function newEmployee() {
+    resetEmployeeForm()
+    setEditingEmployee(null)
+    setShowEmployeeForm(true)
+  }
+
+  async function handleSaveEmployee(event: React.FormEvent) {
+    event.preventDefault()
+    if (!currentUser) return
+
+    const payload = {
+      hr_no: currentUser.employee_no,
+      ...employeeFormData,
+      direct_manager_no: employeeFormData.direct_manager_no || null,
+      first_proxy_no: employeeFormData.first_proxy_no || null,
+      second_proxy_no: employeeFormData.second_proxy_no || null,
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/api/hr/employee/upsert`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      const data = await res.json()
+      if (!data.ok) {
+        setHrEmployeeMessage(data.message || t(lang, '儲存失敗', 'Save failed', 'Lưu thất bại'))
+        return
+      }
+      setHrEmployeeMessage(t(lang, '員工資料已儲存', 'Employee saved', 'Đã lưu nhân viên'))
+      resetEmployeeForm()
+      await loadHrEmployees()
+    } catch {
+      setHrEmployeeMessage(t(lang, '儲存失敗，請確認 API 是否正常', 'Save failed. Please check API.', 'Lưu thất bại. Vui lòng kiểm tra API.'))
+    }
+  }
+
+  async function handleDeactivateEmployee(employeeNo: string) {
+    if (!currentUser) return
+    if (!window.confirm(t(lang, `確定要停用員工 ${employeeNo} 嗎？`, `Confirm deactivate employee ${employeeNo}?`, `Xác nhận vô hiệu hóa nhân viên ${employeeNo}?`))) return
+
+    try {
+      const res = await fetch(`${API_BASE}/api/hr/employee/deactivate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hr_no: currentUser.employee_no, employee_no: employeeNo })
+      })
+      const data = await res.json()
+      if (!data.ok) {
+        setHrEmployeeMessage(data.message || t(lang, '停用失敗', 'Deactivate failed', 'Vô hiệu hóa thất bại'))
+        return
+      }
+      setHrEmployeeMessage(t(lang, '員工已停用', 'Employee deactivated', 'Nhân viên đã bị vô hiệu hóa'))
+      await loadHrEmployees()
+    } catch {
+      setHrEmployeeMessage(t(lang, '停用失敗，請確認 API 是否正常', 'Deactivate failed. Please check API.', 'Vô hiệu hóa thất bại. Vui lòng kiểm tra API.'))
+    }
+  }
+
+  async function loadHrEmployees() {
+    if (!currentUser) return
+    setIsLoadingHrEmployees(true)
+    setHrEmployeeMessage(t(lang, '查詢中...', 'Loading...', 'Đang tải...'))
+    try {
+      const res = await fetch(`${API_BASE}/api/hr/employees?hr_no=${encodeURIComponent(currentUser.employee_no)}`)
+      const data = await res.json()
+      if (!data.ok) {
+        setHrEmployeeMessage(data.message || t(lang, '查詢員工失敗', 'Failed to load employees', 'Tải nhân viên thất bại'))
+        setHrEmployees([])
+        return
+      }
+      setHrEmployees(data.employees || [])
+      setHrEmployeeMessage(t(lang, `已載入 ${data.employees?.length || 0} 筆員工`, `Loaded ${data.employees?.length || 0} employee(s)`, `Đã tải ${data.employees?.length || 0} nhân viên`))
+    } catch {
+      setHrEmployeeMessage(t(lang, '查詢失敗，請確認 API 是否正常', 'Query failed. Please check API.', 'Truy vấn thất bại. Vui lòng kiểm tra API.'))
+      setHrEmployees([])
+    } finally {
+      setIsLoadingHrEmployees(false)
+    }
+  }
+
+  // ----- 一般員工列表（僅 active）-----
   async function loadEmployees() {
     try {
-      const res = await fetch('/api/employees')
+      const res = await fetch(`${API_BASE}/api/employees`)
       const data = await res.json()
       if (data.ok) setEmployeeList(data.employees || [])
     } catch (err) {
@@ -303,6 +476,7 @@ function App() {
     }
   }
 
+  // ----- 登入 -----
   async function handleLogin(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const normalizedEmployeeNo = loginEmployeeNo.trim().toUpperCase()
@@ -314,7 +488,7 @@ function App() {
     setIsLoggingIn(true)
     setLoginError('')
     try {
-      const response = await fetch('/api/auth/login', {
+      const response = await fetch(`${API_BASE}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ employee_no: normalizedEmployeeNo, pin_code: normalizedPinCode }),
@@ -348,6 +522,7 @@ function App() {
       await loadEmployees()
       await loadMyPunches()
       await loadMyOvertimes()
+      if (canManageEmployees) await loadHrEmployees()
     } catch {
       setLoginError(t(lang, '登入失敗，請確認 API 是否正常', 'Login failed. Please check the API.', 'Đăng nhập thất bại. Vui lòng kiểm tra API.'))
       setCurrentUser(null)
@@ -372,19 +547,23 @@ function App() {
     setHrLeaves([])
     setHrPunches([])
     setHrOvertimes([])
+    setHrEmployees([])
     setApprovalMessage('')
     setMyLeaveMessage('')
     setMyPunchMessage('')
     setMyOvertimeMessage('')
     setHrMessage('')
+    setHrEmployeeMessage('')
     setResult(null)
     setError('')
     setPunchMessage('')
     setOvertimeMessage('')
     setActiveSection('form')
     setEmployeeList([])
+    resetEmployeeForm()
   }
 
+  // ----- 請假送出 -----
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (isSubmitting) return
@@ -415,7 +594,7 @@ function App() {
     setIsSubmitting(true)
     setError('')
     try {
-      const response = await fetch('/api/leave/create', {
+      const response = await fetch(`${API_BASE}/api/leave/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -463,6 +642,7 @@ function App() {
     }
   }
 
+  // ----- 補卡送出 -----
   async function handlePunchSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!punchDate || !punchTime || !punchReason.trim()) {
@@ -470,7 +650,7 @@ function App() {
       return
     }
     try {
-      const response = await fetch('/api/punch/create', {
+      const response = await fetch(`${API_BASE}/api/punch/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -498,6 +678,7 @@ function App() {
     }
   }
 
+  // ----- 加班送出 -----
   async function handleOvertimeSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const overtimeHours = calculateSimpleHours(overtimeStart, overtimeEnd)
@@ -506,7 +687,7 @@ function App() {
       return
     }
     try {
-      const response = await fetch('/api/overtime/create', {
+      const response = await fetch(`${API_BASE}/api/overtime/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -536,6 +717,7 @@ function App() {
     }
   }
 
+  // ----- 待審核 -----
   async function loadPendingApprovals() {
     const normalizedApproverNo = approverNo.trim().toUpperCase()
     if (!normalizedApproverNo) {
@@ -545,7 +727,7 @@ function App() {
     setIsLoadingApprovals(true)
     setApprovalMessage(t(lang, '查詢中...', 'Loading...', 'Đang tải...'))
     try {
-      const response = await fetch(`/api/leave/pending?approver_no=${encodeURIComponent(normalizedApproverNo)}`)
+      const response = await fetch(`${API_BASE}/api/leave/pending?approver_no=${encodeURIComponent(normalizedApproverNo)}`)
       const data = await response.json()
       if (!data.ok) {
         setApprovalMessage(data.message || t(lang, '查詢待審核資料失敗', 'Failed to load pending approvals', 'Tải dữ liệu chờ duyệt thất bại'))
@@ -582,7 +764,7 @@ function App() {
     if (!window.confirm(t(lang, `確定要${actionText}這張假單嗎？`, `Are you sure you want to ${actionText.toLowerCase()} this leave request?`, `Bạn có chắc muốn ${actionText.toLowerCase()} đơn nghỉ phép này không?`))) return
     setApprovalMessage(t(lang, `${actionText}處理中...`, 'Processing...', 'Đang xử lý...'))
     try {
-      const response = await fetch('/api/leave/approve', {
+      const response = await fetch(`${API_BASE}/api/leave/approve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ leave_id: leaveId, approver_no: normalizedApproverNo, action }),
@@ -611,7 +793,7 @@ function App() {
     if (!window.confirm(t(lang, `確定要${actionText}這張補卡單嗎？`, `Are you sure you want to ${actionText.toLowerCase()} this punch correction?`, `Bạn có chắc muốn ${actionText.toLowerCase()} đơn chấm công này không?`))) return
     setApprovalMessage(t(lang, `補卡${actionText}處理中...`, 'Processing...', 'Đang xử lý...'))
     try {
-      const response = await fetch('/api/punch/action', {
+      const response = await fetch(`${API_BASE}/api/punch/action`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -644,7 +826,7 @@ function App() {
     if (!window.confirm(t(lang, `確定要${actionText}這張加班單嗎？`, `Are you sure you want to ${actionText.toLowerCase()} this overtime request?`, `Bạn có chắc muốn ${actionText.toLowerCase()} đơn tăng ca này không?`))) return
     setApprovalMessage(t(lang, `加班${actionText}處理中...`, 'Processing...', 'Đang xử lý...'))
     try {
-      const response = await fetch('/api/overtime/action', {
+      const response = await fetch(`${API_BASE}/api/overtime/action`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -667,10 +849,11 @@ function App() {
     }
   }
 
+  // ----- 我的假單、補卡、加班 -----
   async function loadMyLeavesSilent() {
     if (!currentUser) return
     try {
-      const res = await fetch(`/api/leave/my?employee_no=${encodeURIComponent(currentUser.employee_no)}`)
+      const res = await fetch(`${API_BASE}/api/leave/my?employee_no=${encodeURIComponent(currentUser.employee_no)}`)
       const data = await res.json()
       if (data.ok) setMyLeaves(data.leaves || [])
     } catch { /* silent */ }
@@ -681,7 +864,7 @@ function App() {
     setIsLoadingMyLeaves(true)
     setMyLeaveMessage(t(lang, '查詢中...', 'Loading...', 'Đang tải...'))
     try {
-      const res = await fetch(`/api/leave/my?employee_no=${encodeURIComponent(currentUser.employee_no)}`)
+      const res = await fetch(`${API_BASE}/api/leave/my?employee_no=${encodeURIComponent(currentUser.employee_no)}`)
       const data = await res.json()
       if (!data.ok) {
         setMyLeaveMessage(data.message || t(lang, '查詢我的假單失敗', 'Failed to load my leave requests', 'Tải đơn nghỉ phép thất bại'))
@@ -703,7 +886,7 @@ function App() {
     setIsLoadingMyPunches(true)
     setMyPunchMessage(t(lang, '查詢中...', 'Loading...', 'Đang tải...'))
     try {
-      const res = await fetch(`/api/punch/my?employee_no=${encodeURIComponent(currentUser.employee_no)}`)
+      const res = await fetch(`${API_BASE}/api/punch/my?employee_no=${encodeURIComponent(currentUser.employee_no)}`)
       const data = await res.json()
       if (!data.ok) {
         setMyPunchMessage(data.message || t(lang, '查詢我的補卡失敗', 'Failed to load my punch records', 'Tải đơn chấm công thất bại'))
@@ -725,7 +908,7 @@ function App() {
     setIsLoadingMyOvertimes(true)
     setMyOvertimeMessage(t(lang, '查詢中...', 'Loading...', 'Đang tải...'))
     try {
-      const res = await fetch(`/api/overtime/my?employee_no=${encodeURIComponent(currentUser.employee_no)}`)
+      const res = await fetch(`${API_BASE}/api/overtime/my?employee_no=${encodeURIComponent(currentUser.employee_no)}`)
       const data = await res.json()
       if (!data.ok) {
         setMyOvertimeMessage(data.message || t(lang, '查詢我的加班失敗', 'Failed to load my overtime records', 'Tải đơn tăng ca thất bại'))
@@ -756,7 +939,7 @@ function App() {
     ))) return
     setMyLeaveMessage(t(lang, '取消處理中...', 'Cancelling...', 'Đang xử lý hủy...'))
     try {
-      const res = await fetch('/api/leave/cancel', {
+      const res = await fetch(`${API_BASE}/api/leave/cancel`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ leave_id: leaveId, employee_no: currentUser.employee_no, cancel_reason: cancelReason.trim() }),
@@ -788,7 +971,7 @@ function App() {
     ))) return
     setHrMessage(t(lang, '作廢處理中...', 'Voiding...', 'Đang xử lý hủy...'))
     try {
-      const res = await fetch('/api/leave/void', {
+      const res = await fetch(`${API_BASE}/api/leave/void`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ leave_id: leaveId, hr_no: currentUser.employee_no, void_reason: voidReason.trim() }),
@@ -808,7 +991,7 @@ function App() {
   async function loadHrReportSilent() {
     if (!canViewHrReport) return
     try {
-      const res = await fetch('/api/hr/report')
+      const res = await fetch(`${API_BASE}/api/hr/report`)
       const data = await res.json()
       if (data.ok) {
         setHrLeaves(data.leaves || [])
@@ -822,7 +1005,7 @@ function App() {
     setIsLoadingHrLeaves(true)
     setHrMessage(t(lang, '查詢中...', 'Loading...', 'Đang tải...'))
     try {
-      const res = await fetch('/api/hr/report')
+      const res = await fetch(`${API_BASE}/api/hr/report`)
       const data = await res.json()
       if (!data.ok) {
         setHrMessage(data.message || t(lang, '查詢 HR 報表失敗', 'Failed to load HR report', 'Tải báo cáo nhân sự thất bại'))
@@ -971,6 +1154,11 @@ function App() {
             </button>
             {canApprove && <button type="button" onClick={() => setActiveSection('approvals')}>{t(lang, '待審核', 'Pending Approval', 'Chờ duyệt')}</button>}
             {canViewHrReport && <button type="button" onClick={() => setActiveSection('hr')}>{t(lang, 'HR報表', 'HR Report', 'Báo cáo nhân sự')}</button>}
+            {canManageEmployees && (
+              <button type="button" onClick={() => { setActiveSection('employees'); loadHrEmployees(); resetEmployeeForm() }}>
+                {t(lang, '員工管理', 'Employee Mgmt', 'Quản lý nhân viên')}
+              </button>
+            )}
             <button type="button" onClick={handleLogout}>{t(lang, '登出', 'Logout', 'Đăng xuất')}</button>
           </div>
         )}
@@ -1029,6 +1217,97 @@ function App() {
             <div className="badge">PWA</div>
           </header>
 
+          {/* 員工管理區塊（HR / 總經理可見） */}
+          {activeSection === 'employees' && canManageEmployees && (
+            <section className="card result-card">
+              <h2>{t(lang, '員工資料管理', 'Employee Management', 'Quản lý nhân viên')}</h2>
+              <div className="approval-search">
+                <button className="submit-btn" onClick={loadHrEmployees} disabled={isLoadingHrEmployees}>
+                  {isLoadingHrEmployees ? t(lang, '查詢中...', 'Loading...', 'Đang tải...') : t(lang, '查詢員工', 'Load Employees', 'Tải nhân viên')}
+                </button>
+                <button className="submit-btn" onClick={newEmployee}>{t(lang, '新增員工', 'Add Employee', 'Thêm nhân viên')}</button>
+              </div>
+              {hrEmployeeMessage && <div className="note-box">{hrEmployeeMessage}</div>}
+
+              {showEmployeeForm && (
+                <div style={{ margin: '20px 0', padding: '16px', border: '1px solid #ddd', borderRadius: '12px' }}>
+                  <h3>{editingEmployee ? t(lang, '編輯員工', 'Edit Employee', 'Sửa nhân viên') : t(lang, '新增員工', 'Add Employee', 'Thêm nhân viên')}</h3>
+                  <form onSubmit={handleSaveEmployee}>
+                    <div className="two">
+                      <input type="text" placeholder={t(lang, '員工編號 *', 'Employee No. *', 'Mã NV *')} value={employeeFormData.employee_no} onChange={e => setEmployeeFormData({ ...employeeFormData, employee_no: e.target.value })} required />
+                      <input type="text" placeholder={t(lang, '姓名 *', 'Name *', 'Tên *')} value={employeeFormData.employee_name} onChange={e => setEmployeeFormData({ ...employeeFormData, employee_name: e.target.value })} required />
+                    </div>
+                    <div className="two">
+                      <input type="text" placeholder={t(lang, '部門', 'Department', 'Bộ phận')} value={employeeFormData.department_name} onChange={e => setEmployeeFormData({ ...employeeFormData, department_name: e.target.value })} />
+                      <input type="text" placeholder={t(lang, '職稱', 'Position', 'Chức vụ')} value={employeeFormData.position_title} onChange={e => setEmployeeFormData({ ...employeeFormData, position_title: e.target.value })} />
+                    </div>
+                    <div className="two">
+                      <input type="text" placeholder={t(lang, '職等', 'Rank', 'Cấp bậc')} value={employeeFormData.rank_type} onChange={e => setEmployeeFormData({ ...employeeFormData, rank_type: e.target.value })} />
+                      <input type="text" placeholder={t(lang, '直屬主管編號', 'Direct Manager No.', 'Mã quản lý trực tiếp')} value={employeeFormData.direct_manager_no} onChange={e => setEmployeeFormData({ ...employeeFormData, direct_manager_no: e.target.value })} />
+                    </div>
+                    <div className="two">
+                      <input type="text" placeholder={t(lang, '直屬主管姓名', 'Direct Manager Name', 'Tên quản lý trực tiếp')} value={employeeFormData.direct_manager_name} onChange={e => setEmployeeFormData({ ...employeeFormData, direct_manager_name: e.target.value })} />
+                      <input type="text" placeholder={t(lang, '第一代理人編號', '1st Proxy No.', 'Mã đại diện 1')} value={employeeFormData.first_proxy_no} onChange={e => setEmployeeFormData({ ...employeeFormData, first_proxy_no: e.target.value })} />
+                    </div>
+                    <div className="two">
+                      <input type="text" placeholder={t(lang, '第一代理人姓名', '1st Proxy Name', 'Tên đại diện 1')} value={employeeFormData.first_proxy_name} onChange={e => setEmployeeFormData({ ...employeeFormData, first_proxy_name: e.target.value })} />
+                      <input type="text" placeholder={t(lang, '第二代理人編號', '2nd Proxy No.', 'Mã đại diện 2')} value={employeeFormData.second_proxy_no} onChange={e => setEmployeeFormData({ ...employeeFormData, second_proxy_no: e.target.value })} />
+                    </div>
+                    <div className="two">
+                      <input type="text" placeholder={t(lang, '第二代理人姓名', '2nd Proxy Name', 'Tên đại diện 2')} value={employeeFormData.second_proxy_name} onChange={e => setEmployeeFormData({ ...employeeFormData, second_proxy_name: e.target.value })} />
+                      <input type="text" placeholder={t(lang, 'PIN碼', 'PIN Code', 'Mã PIN')} value={employeeFormData.pin_code} onChange={e => setEmployeeFormData({ ...employeeFormData, pin_code: e.target.value })} />
+                    </div>
+                    <div className="two">
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <input type="checkbox" checked={employeeFormData.is_active === 1} onChange={e => setEmployeeFormData({ ...employeeFormData, is_active: e.target.checked ? 1 : 0 })} />
+                        {t(lang, '啟用', 'Active', 'Kích hoạt')}
+                      </label>
+                    </div>
+                    <div className="approval-actions" style={{ marginTop: '16px' }}>
+                      <button type="submit" className="approve-btn">{t(lang, '儲存', 'Save', 'Lưu')}</button>
+                      <button type="button" className="reject-btn" onClick={() => { resetEmployeeForm(); setShowEmployeeForm(false) }}>{t(lang, '取消', 'Cancel', 'Hủy')}</button>
+                    </div>
+                  </form>
+                </div>
+              )}
+
+              {hrEmployees.length === 0 ? (
+                <p className="small">{t(lang, '暫無員工資料', 'No employee data', 'Chưa có dữ liệu nhân viên')}</p>
+              ) : (
+                <div className="approval-list" style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr>
+                        <th>{t(lang, '編號', 'No.', 'Mã')}</th><th>{t(lang, '姓名', 'Name', 'Tên')}</th><th>{t(lang, '部門', 'Dept', 'Bộ phận')}</th><th>{t(lang, '職稱', 'Title', 'Chức vụ')}</th><th>{t(lang, '主管', 'Manager', 'Quản lý')}</th><th>{t(lang, '第一代理人', '1st Proxy', 'Đại diện 1')}</th><th>{t(lang, '第二代理人', '2nd Proxy', 'Đại diện 2')}</th><th>{t(lang, '狀態', 'Status', 'Trạng thái')}</th><th>{t(lang, '操作', 'Actions', 'Hành động')}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {hrEmployees.map(emp => (
+                        <tr key={emp.employee_no}>
+                          <td>{emp.employee_no}</td>
+                          <td>{emp.employee_name}</td>
+                          <td>{emp.department_name}</td>
+                          <td>{emp.position_title}</td>
+                          <td>{emp.direct_manager_name} ({emp.direct_manager_no})</td>
+                          <td>{emp.first_proxy_name} ({emp.first_proxy_no})</td>
+                          <td>{emp.second_proxy_name} ({emp.second_proxy_no})</td>
+                          <td>{emp.is_active ? t(lang, '啟用', 'Active', 'Kích hoạt') : t(lang, '停用', 'Inactive', 'Vô hiệu')}</td>
+                          <td>
+                            <button className="approve-btn" onClick={() => editEmployee(emp)}>{t(lang, '編輯', 'Edit', 'Sửa')}</button>
+                            {emp.is_active === 1 && (
+                              <button className="reject-btn" style={{ marginLeft: '8px' }} onClick={() => handleDeactivateEmployee(emp.employee_no)}>{t(lang, '停用', 'Deactivate', 'Vô hiệu')}</button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* 表單區塊（請假/補卡/加班/我的紀錄/待審核/HR報表）與原始完全一致 */}
           {activeSection === 'form' && (
             <>
               <section className="card result-card">
@@ -1126,7 +1405,12 @@ function App() {
                   <h2>{t(lang, '員工資料', 'Employee Data', 'Thông tin nhân viên')}</h2>
                   <table>
                     <thead>
-                      <tr><th>{t(lang, '編號', 'No.', 'Mã')}</th><th>{t(lang, '姓名', 'Name', 'Tên')}</th><th>{t(lang, '職稱', 'Position', 'Chức vụ')}</th><th>{t(lang, '部門', 'Department', 'Bộ phận')}</th></tr>
+                      <tr>
+                        <th>{t(lang, '編號', 'No.', 'Mã')}</th>
+                        <th>{t(lang, '姓名', 'Name', 'Tên')}</th>
+                        <th>{t(lang, '職稱', 'Position', 'Chức vụ')}</th>
+                        <th>{t(lang, '部門', 'Department', 'Bộ phận')}</th>
+                      </tr>
                     </thead>
                     <tbody>
                       {employeeList.map(emp => (
@@ -1149,9 +1433,18 @@ function App() {
                     <div><span>{t(lang, '假單編號', 'Request ID', 'Mã đơn')}</span><strong>{result.leaveRequestId || '-'}</strong></div>
                     <div><span>{t(lang, '員工', 'Employee', 'Nhân viên')}</span><strong>{result.employeeNo} {result.employeeName}</strong></div>
                     <div><span>{t(lang, '假別', 'Leave Type', 'Loại nghỉ')}</span><strong>{result.leaveType}</strong></div>
-                    <div><span>{t(lang, '期間', 'Period', 'Thời gian')}</span><strong>{result.startDate} {result.startTime} ~ {result.endDate} {result.endTime}</strong></div>
-                    <div><span>{t(lang, '時數', 'Hours', 'Số giờ')}</span><strong>{result.totalHours} {t(lang, '小時', 'hr(s)', 'giờ')}</strong></div>
-                    <div><span>{t(lang, '目前審核主管', 'Current Approver', 'Người phê duyệt')}</span><strong>{result.currentApproverName} / {result.currentApproverNo}</strong></div>
+                    <div>
+                      <span>{t(lang, '期間', 'Period', 'Thời gian')}</span>
+                      <strong>{result.startDate} {result.startTime} ~ {result.endDate} {result.endTime}</strong>
+                    </div>
+                    <div>
+                      <span>{t(lang, '時數', 'Hours', 'Số giờ')}</span>
+                      <strong>{result.totalHours} {t(lang, '小時', 'hr(s)', 'giờ')}</strong>
+                    </div>
+                    <div>
+                      <span>{t(lang, '目前審核主管', 'Current Approver', 'Người phê duyệt')}</span>
+                      <strong>{result.currentApproverName} / {result.currentApproverNo}</strong>
+                    </div>
                   </div>
                   <p className="small">{result.totalHours >= 24 ? t(lang, '三天以上請假已直接送交董事長審核，請耐心等候。', 'Leave request for more than 3 days has been sent directly to the Chairman for approval.', 'Đơn nghỉ trên 3 ngày đã được gửi trực tiếp đến Chủ tịch để phê duyệt.') : t(lang, '假單已送出，將由主管審核。', 'Leave request submitted and will be reviewed by your supervisor.', 'Đơn nghỉ đã được gửi và sẽ được quản lý xem xét.')}</p>
                 </section>
@@ -1161,15 +1454,9 @@ function App() {
               <section className="card result-card">
                 <h2>{t(lang, '我的紀錄', 'My Records', 'Hồ sơ của tôi')}</h2>
                 <div className="form-tabs">
-                  <button className={activeRecordTab === 'leave' ? 'active' : ''} onClick={() => setActiveRecordTab('leave')}>
-                    {t(lang, '請假紀錄', 'Leave Records', 'Lịch sử nghỉ phép')}
-                  </button>
-                  <button className={activeRecordTab === 'punch' ? 'active' : ''} onClick={() => setActiveRecordTab('punch')}>
-                    {t(lang, '補卡紀錄', 'Punch Records', 'Lịch sử chấm công')}
-                  </button>
-                  <button className={activeRecordTab === 'overtime' ? 'active' : ''} onClick={() => setActiveRecordTab('overtime')}>
-                    {t(lang, '加班紀錄', 'Overtime Records', 'Lịch sử tăng ca')}
-                  </button>
+                  <button className={activeRecordTab === 'leave' ? 'active' : ''} onClick={() => setActiveRecordTab('leave')}>{t(lang, '請假紀錄', 'Leave Records', 'Lịch sử nghỉ phép')}</button>
+                  <button className={activeRecordTab === 'punch' ? 'active' : ''} onClick={() => setActiveRecordTab('punch')}>{t(lang, '補卡紀錄', 'Punch Records', 'Lịch sử chấm công')}</button>
+                  <button className={activeRecordTab === 'overtime' ? 'active' : ''} onClick={() => setActiveRecordTab('overtime')}>{t(lang, '加班紀錄', 'Overtime Records', 'Lịch sử tăng ca')}</button>
                 </div>
 
                 {activeRecordTab === 'leave' && (
@@ -1194,9 +1481,7 @@ function App() {
                             </div>
                             {leave.status === 'pending' && (
                               <div className="approval-actions">
-                                <button className="reject-btn" onClick={() => handleCancelLeave(leave.id)}>
-                                  {t(lang, '取消申請', 'Cancel', 'Hủy đơn')}
-                                </button>
+                                <button className="reject-btn" onClick={() => handleCancelLeave(leave.id)}>{t(lang, '取消申請', 'Cancel', 'Hủy đơn')}</button>
                               </div>
                             )}
                           </div>
