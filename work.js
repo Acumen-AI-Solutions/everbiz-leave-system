@@ -65,7 +65,6 @@ function determineSystemRole(employeeNo, rankType, positionTitle, hrNo) {
   return 'employee'
 }
 
-// 檢查呼叫者是否為人資（用於管理端 API）
 async function isHr(env, hrNo) {
   if (!hrNo) return false
   const user = await getEmployee(env.DB, hrNo)
@@ -128,7 +127,7 @@ async function handleRequest(request, env) {
     })
   }
 
-  // ----- 員工列表（一般使用者，僅列出 active 員工）-----
+  // ----- 員工列表（一般使用者，僅列出 active 員工，不顯示代理人）-----
   if (method === 'GET' && path === '/api/employees') {
     const result = await env.DB.prepare(`
       SELECT
@@ -148,7 +147,7 @@ async function handleRequest(request, env) {
   }
 
   // ========== HR 管理專用 API（限人資） ==========
-  // 1. 取得所有員工（含停用）
+  // 1. 取得所有員工（含停用、含代理人欄位）
   if (method === 'GET' && path === '/api/hr/employees') {
     const hrNo = url.searchParams.get('hr_no')
     if (!hrNo) return jsonResponse({ ok: false, message: '缺少 hr_no' }, 400)
@@ -164,6 +163,10 @@ async function handleRequest(request, env) {
         rank_type,
         direct_manager_no,
         direct_manager_name,
+        first_proxy_no,
+        first_proxy_name,
+        second_proxy_no,
+        second_proxy_name,
         pin_code,
         is_active,
         created_at,
@@ -174,7 +177,7 @@ async function handleRequest(request, env) {
     return jsonResponse({ ok: true, employees: result.results || [] })
   }
 
-  // 2. 新增或更新員工
+  // 2. 新增或更新員工（支援第一、第二代理人）
   if (method === 'POST' && path === '/api/hr/employee/upsert') {
     const body = await request.json()
     const hrNo = body.hr_no
@@ -190,7 +193,11 @@ async function handleRequest(request, env) {
     const rankType = String(body.rank_type || '').trim()
     const directManagerNo = String(body.direct_manager_no || '').trim().toUpperCase() || null
     const directManagerName = String(body.direct_manager_name || '').trim() || null
-    const pinCode = String(body.pin_code || '').trim() || employeeNo // 預設 PIN = 員工編號
+    const firstProxyNo = String(body.first_proxy_no || '').trim().toUpperCase() || null
+    const firstProxyName = String(body.first_proxy_name || '').trim() || null
+    const secondProxyNo = String(body.second_proxy_no || '').trim().toUpperCase() || null
+    const secondProxyName = String(body.second_proxy_name || '').trim() || null
+    const pinCode = String(body.pin_code || '').trim() || employeeNo
     const isActive = body.is_active === undefined ? 1 : (body.is_active ? 1 : 0)
 
     if (!employeeNo || !employeeName) {
@@ -198,7 +205,6 @@ async function handleRequest(request, env) {
     }
 
     const now = getTaiwanTimeString()
-    // 檢查是否已存在
     const existing = await env.DB.prepare(`
       SELECT employee_no FROM employees WHERE employee_no = ?
     `).bind(employeeNo).first()
@@ -214,31 +220,73 @@ async function handleRequest(request, env) {
           rank_type = ?,
           direct_manager_no = ?,
           direct_manager_name = ?,
+          first_proxy_no = ?,
+          first_proxy_name = ?,
+          second_proxy_no = ?,
+          second_proxy_name = ?,
           pin_code = ?,
           is_active = ?,
           updated_at = ?
         WHERE employee_no = ?
       `).bind(
-        employeeName, departmentName, positionTitle, rankType,
-        directManagerNo, directManagerName, pinCode, isActive, now, employeeNo
+        employeeName,
+        departmentName,
+        positionTitle,
+        rankType,
+        directManagerNo,
+        directManagerName,
+        firstProxyNo,
+        firstProxyName,
+        secondProxyNo,
+        secondProxyName,
+        pinCode,
+        isActive,
+        now,
+        employeeNo
       ).run()
       return jsonResponse({ ok: true, message: '員工資料已更新', employee_no: employeeNo })
     } else {
       // 新增
       await env.DB.prepare(`
         INSERT INTO employees (
-          employee_no, employee_name, department_name, position_title, rank_type,
-          direct_manager_no, direct_manager_name, pin_code, is_active, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          employee_no,
+          employee_name,
+          department_name,
+          position_title,
+          rank_type,
+          direct_manager_no,
+          direct_manager_name,
+          first_proxy_no,
+          first_proxy_name,
+          second_proxy_no,
+          second_proxy_name,
+          pin_code,
+          is_active,
+          created_at,
+          updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
-        employeeNo, employeeName, departmentName, positionTitle, rankType,
-        directManagerNo, directManagerName, pinCode, isActive, now, now
+        employeeNo,
+        employeeName,
+        departmentName,
+        positionTitle,
+        rankType,
+        directManagerNo,
+        directManagerName,
+        firstProxyNo,
+        firstProxyName,
+        secondProxyNo,
+        secondProxyName,
+        pinCode,
+        isActive,
+        now,
+        now
       ).run()
       return jsonResponse({ ok: true, message: '員工已新增', employee_no: employeeNo })
     }
   }
 
-  // 3. 停用員工（軟刪除，設 is_active = 0）
+  // 3. 停用員工（軟刪除）
   if (method === 'POST' && path === '/api/hr/employee/deactivate') {
     const body = await request.json()
     const hrNo = body.hr_no
