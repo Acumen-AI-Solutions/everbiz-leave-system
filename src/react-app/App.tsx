@@ -1274,7 +1274,7 @@ function App() {
                         />
 
                         <div className="note-box">
-                          {t(lang, '簽核流程：部門主管 → 人資單位', 'Approval flow: Dept. Manager → HR', 'Quy trình duyệt: Quản lý → Nhân sự')}
+                          {t(lang, '簽核流程：人資 → 直屬主管', 'Approval flow: HR → Direct Supervisor', 'Quy trình duyệt: Nhân sự → Quản lý trực tiếp')}
                         </div>
 
                         <button className="submit-btn" type="submit">
@@ -1327,9 +1327,9 @@ function App() {
 
                         <div className="note-box">
                           {t(lang,
-                            '簽核流程依區域判斷：辦公區為部門主管 → 董事長 → 人資；廠務區依製造/生管流程加簽。',
-                            'Approval flow varies by area: Office — Dept. Manager → CEO → HR; Factory — per manufacturing/production flow.',
-                            'Quy trình duyệt theo khu vực: Văn phòng — Quản lý → Giám đốc → Nhân sự; Xưởng — theo quy trình sản xuất.',
+                            '簽核流程：人資 → 直屬主管',
+                            'Approval flow: HR → Direct Supervisor',
+                            'Quy trình duyệt: Nhân sự → Quản lý trực tiếp',
                           )}
                         </div>
 
@@ -1388,9 +1388,9 @@ function App() {
                   </div>
                   <p className="small">
                     {t(lang,
-                      '假單已寫入 D1 資料庫，主管可在「待審核」區查詢並核准或駁回。',
-                      'The leave request has been saved to D1 database. The manager can review, approve, or reject it in the approval section.',
-                      'Đơn nghỉ phép đã được lưu vào D1 database. Quản lý có thể xem, duyệt hoặc từ chối trong mục chờ duyệt.',
+                      '假單已寫入資料庫，將先由人資審核，再由直屬主管核准。',
+                      'The request has been saved to database. It will be reviewed by HR first, then by the direct supervisor.',
+                      'Đơn đã được lưu vào cơ sở dữ liệu. Sẽ được Nhân sự duyệt trước, sau đó đến Quản lý trực tiếp.',
                     )}
                   </p>
                 </section>
