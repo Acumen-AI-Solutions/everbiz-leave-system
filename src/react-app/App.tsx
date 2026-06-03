@@ -576,11 +576,12 @@ function App() {
       setResult(null)
       return
     }
-    if (totalHours >= 24) {
+    // 修改處：嚴格大於 24 小時才送出董事長確認訊息（三天以上）
+    if (totalHours > 24) {
       const confirmMsg = t(lang,
-        '您申請的請假時數超過三天（24小時），將直接送董事長審核，確定送出嗎？',
-        'Your leave request exceeds three days (24 hours). It will be sent directly to the Chairman. Proceed?',
-        'Đơn nghỉ của bạn vượt quá ba ngày (24 giờ). Sẽ gửi thẳng đến Chủ tịch. Tiếp tục?'
+        '您申請的請假時數超過三天，主管核准後將再送董事長審核，確定送出嗎？',
+        'Your leave request exceeds three days. After manager approval, it will be sent to the Chairman. Proceed?',
+        'Đơn nghỉ của bạn vượt quá ba ngày. Sau khi quản lý duyệt, sẽ gửi tiếp đến Chủ tịch. Tiếp tục?'
       )
       if (!window.confirm(confirmMsg)) return
     }
