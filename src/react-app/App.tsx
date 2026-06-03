@@ -3,6 +3,7 @@ import './App.css'
 
 const API_BASE = 'https://everbiz-leave-api.imd13.workers.dev'
 
+// ==================== 型別定義 ====================
 type Employee = {
   employee_no: string
   employee_name: string
@@ -228,7 +229,7 @@ function downloadCsv(rows: unknown[][], headers: string[], filename: string) {
   URL.revokeObjectURL(url)
 }
 
-// ========== 排序函數 ==========
+// ==================== 排序函數 ====================
 function statusOrder(status: string): number {
   if (status === 'approved') return 1
   if (status === 'pending') return 2
@@ -247,7 +248,7 @@ function sortByStatus<T extends { status: string; updated_at?: string; created_a
     return timeB - timeA
   })
 }
-// =================================
+// ==================================================
 
 function App() {
   const [loginEmployeeNo, setLoginEmployeeNo] = useState('')
@@ -1160,6 +1161,7 @@ function App() {
     }
   }, [currentUser])
 
+  // ==================== 渲染（無二次排序） ====================
   return (
     <div className="page">
       <nav className="top-nav">
@@ -1266,21 +1268,17 @@ function App() {
                       <input type="text" placeholder={t(lang, '員工編號 *', 'Employee No. *', 'Mã NV *')} value={employeeFormData.employee_no} onChange={e => setEmployeeFormData({ ...employeeFormData, employee_no: e.target.value })} required />
                       <input type="text" placeholder={t(lang, '姓名 *', 'Name *', 'Tên *')} value={employeeFormData.employee_name} onChange={e => setEmployeeFormData({ ...employeeFormData, employee_name: e.target.value })} required />
                     </div>
-
                     <div className="two">
                       <input type="text" placeholder={t(lang, '部門', 'Department', 'Bộ phận')} value={employeeFormData.department_name} onChange={e => setEmployeeFormData({ ...employeeFormData, department_name: e.target.value })} />
                       <input type="text" placeholder={t(lang, '職稱', 'Position', 'Chức vụ')} value={employeeFormData.position_title} onChange={e => setEmployeeFormData({ ...employeeFormData, position_title: e.target.value })} />
                     </div>
-
                     <div className="two">
                       <input type="text" placeholder={t(lang, '職等 / 角色', 'Rank / Role', 'Cấp bậc / Vai trò')} value={employeeFormData.rank_type} onChange={e => setEmployeeFormData({ ...employeeFormData, rank_type: e.target.value })} />
                       <input type="text" placeholder={t(lang, '此員工的審核主管工號', 'This employee’s approver no.', 'Mã người duyệt của nhân viên này')} value={employeeFormData.direct_manager_no} onChange={e => setEmployeeFormData({ ...employeeFormData, direct_manager_no: e.target.value })} />
                     </div>
-
                     <div className="two">
                       <input type="text" placeholder={t(lang, '此員工的審核主管姓名', 'This employee’s approver name', 'Tên người duyệt của nhân viên này')} value={employeeFormData.direct_manager_name} onChange={e => setEmployeeFormData({ ...employeeFormData, direct_manager_name: e.target.value })} />
                     </div>
-
                     <div className="note-box">
                       {t(
                         lang,
@@ -1289,21 +1287,17 @@ function App() {
                         'Ghi chú: “Người duyệt của nhân viên này” là người duyệt đơn nghỉ, chấm công hoặc tăng ca của nhân viên này. “Người duyệt thay 1 / 2” là người có thể duyệt thay khi nhân viên này là người duyệt. Ví dụ muốn E001 duyệt thay quản lý Chen, hãy chỉnh hồ sơ của quản lý Chen và đặt E001 là người duyệt thay 1.'
                       )}
                     </div>
-
                     <div className="two">
                       <input type="text" placeholder={t(lang, '可代理此員工審核的第一代理人工號', '1st proxy approver no. for this employee', 'Mã người duyệt thay 1')} value={employeeFormData.first_proxy_no} onChange={e => setEmployeeFormData({ ...employeeFormData, first_proxy_no: e.target.value })} />
                       <input type="text" placeholder={t(lang, '可代理此員工審核的第一代理人姓名', '1st proxy approver name for this employee', 'Tên người duyệt thay 1')} value={employeeFormData.first_proxy_name} onChange={e => setEmployeeFormData({ ...employeeFormData, first_proxy_name: e.target.value })} />
                     </div>
-
                     <div className="two">
                       <input type="text" placeholder={t(lang, '可代理此員工審核的第二代理人工號', '2nd proxy approver no. for this employee', 'Mã người duyệt thay 2')} value={employeeFormData.second_proxy_no} onChange={e => setEmployeeFormData({ ...employeeFormData, second_proxy_no: e.target.value })} />
                       <input type="text" placeholder={t(lang, '可代理此員工審核的第二代理人姓名', '2nd proxy approver name for this employee', 'Tên người duyệt thay 2')} value={employeeFormData.second_proxy_name} onChange={e => setEmployeeFormData({ ...employeeFormData, second_proxy_name: e.target.value })} />
                     </div>
-
                     <div className="two">
                       <input type="text" placeholder={t(lang, '登入 PIN 碼', 'Login PIN Code', 'Mã PIN đăng nhập')} value={employeeFormData.pin_code} onChange={e => setEmployeeFormData({ ...employeeFormData, pin_code: e.target.value })} />
                     </div>
-
                     <div className="employee-active-row">
                       <label>
                         <input
@@ -1314,14 +1308,9 @@ function App() {
                         {t(lang, '啟用此員工帳號', 'Activate this employee account', 'Kích hoạt tài khoản nhân viên này')}
                       </label>
                     </div>
-
                     <div className="employee-form-actions">
-                      <button type="submit" className="approve-btn">
-                        {t(lang, '儲存', 'Save', 'Lưu')}
-                      </button>
-                      <button type="button" className="reject-btn" onClick={() => { resetEmployeeForm(); setShowEmployeeForm(false) }}>
-                        {t(lang, '取消', 'Cancel', 'Hủy')}
-                      </button>
+                      <button type="submit" className="approve-btn">{t(lang, '儲存', 'Save', 'Lưu')}</button>
+                      <button type="button" className="reject-btn" onClick={() => { resetEmployeeForm(); setShowEmployeeForm(false) }}>{t(lang, '取消', 'Cancel', 'Hủy')}</button>
                     </div>
                   </form>
                 </div>
@@ -1331,7 +1320,7 @@ function App() {
                 <p className="small">{t(lang, '暫無員工資料', 'No employee data', 'Chưa có dữ liệu nhân viên')}</p>
               ) : (
                 <div className="approval-list" style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '900px' }}>
                     <thead>
                       <tr>
                         <th>{t(lang, '編號', 'No.', 'Mã')}</th><th>{t(lang, '姓名', 'Name', 'Tên')}</th><th>{t(lang, '部門', 'Dept', 'Bộ phận')}</th><th>{t(lang, '職稱', 'Title', 'Chức vụ')}</th><th>{t(lang, '主管', 'Manager', 'Quản lý')}</th><th>{t(lang, '第一代理人', '1st Proxy', 'Đại diện 1')}</th><th>{t(lang, '第二代理人', '2nd Proxy', 'Đại diện 2')}</th><th>{t(lang, '狀態', 'Status', 'Trạng thái')}</th><th>{t(lang, '操作', 'Actions', 'Hành động')}</th>
@@ -1363,7 +1352,6 @@ function App() {
             </section>
           )}
 
-          {/* 表單區塊（請假/補卡/加班/我的紀錄） */}
           {activeSection === 'form' && (
             <>
               <section className="card result-card">
@@ -1401,9 +1389,7 @@ function App() {
                         </div>
                         <div className="note-box">{t(lang, `請假時數：${totalHours} 小時`, `Leave hours: ${totalHours} hr(s)`, `Số giờ nghỉ: ${totalHours} giờ`)}</div>
                         <textarea rows={5} value={reason} onChange={e => setReason(e.target.value)} placeholder={t(lang, '請假原因', 'Reason for leave', 'Lý do nghỉ phép')} />
-                        <button className="submit-btn" type="submit" disabled={isSubmitting}>
-                          {isSubmitting ? t(lang, '送出中...', 'Submitting...', 'Đang gửi...') : t(lang, '送出假單', 'Submit Leave Request', 'Gửi đơn nghỉ phép')}
-                        </button>
+                        <button className="submit-btn" type="submit" disabled={isSubmitting}>{isSubmitting ? t(lang, '送出中...', 'Submitting...', 'Đang gửi...') : t(lang, '送出假單', 'Submit Leave Request', 'Gửi đơn nghỉ phép')}</button>
                       </form>
                     </>
                   )}
@@ -1475,7 +1461,7 @@ function App() {
                           <td>{emp.employee_name}</td>
                           <td>{emp.position_title}</td>
                           <td>{emp.department_name}</td>
-                        </td>
+                        </tr>
                       ))}
                     </tbody>
                   </table>
@@ -1512,9 +1498,7 @@ function App() {
 
                 {activeRecordTab === 'leave' && (
                   <>
-                    <button className="submit-btn" onClick={loadMyLeaves} disabled={isLoadingMyLeaves}>
-                      {isLoadingMyLeaves ? t(lang, '查詢中...', 'Loading...', 'Đang tải...') : t(lang, '查詢我的假單', 'Load My Leave Requests', 'Tải đơn nghỉ phép của tôi')}
-                    </button>
+                    <button className="submit-btn" onClick={loadMyLeaves} disabled={isLoadingMyLeaves}>{isLoadingMyLeaves ? t(lang, '查詢中...', 'Loading...', 'Đang tải...') : t(lang, '查詢我的假單', 'Load My Leave Requests', 'Tải đơn nghỉ phép của tôi')}</button>
                     {myLeaveMessage && <div className="note-box">{myLeaveMessage}</div>}
                     {myLeaves.length === 0 ? (
                       <p className="small">{t(lang, '目前沒有請假紀錄。', 'No leave records found.', 'Không có bản ghi nghỉ phép.')}</p>
@@ -1544,9 +1528,7 @@ function App() {
 
                 {activeRecordTab === 'punch' && (
                   <>
-                    <button className="submit-btn" onClick={loadMyPunches} disabled={isLoadingMyPunches}>
-                      {isLoadingMyPunches ? t(lang, '查詢中...', 'Loading...', 'Đang tải...') : t(lang, '查詢我的補卡', 'Load My Punches', 'Tải đơn chấm công')}
-                    </button>
+                    <button className="submit-btn" onClick={loadMyPunches} disabled={isLoadingMyPunches}>{isLoadingMyPunches ? t(lang, '查詢中...', 'Loading...', 'Đang tải...') : t(lang, '查詢我的補卡', 'Load My Punches', 'Tải đơn chấm công')}</button>
                     {myPunchMessage && <div className="note-box">{myPunchMessage}</div>}
                     {myPunches.length === 0 ? (
                       <p className="small">{t(lang, '目前沒有補卡紀錄。', 'No punch correction records.', 'Không có bản ghi chấm công.')}</p>
@@ -1570,9 +1552,7 @@ function App() {
 
                 {activeRecordTab === 'overtime' && (
                   <>
-                    <button className="submit-btn" onClick={loadMyOvertimes} disabled={isLoadingMyOvertimes}>
-                      {isLoadingMyOvertimes ? t(lang, '查詢中...', 'Loading...', 'Đang tải...') : t(lang, '查詢我的加班', 'Load My Overtime', 'Tải đơn tăng ca')}
-                    </button>
+                    <button className="submit-btn" onClick={loadMyOvertimes} disabled={isLoadingMyOvertimes}>{isLoadingMyOvertimes ? t(lang, '查詢中...', 'Loading...', 'Đang tải...') : t(lang, '查詢我的加班', 'Load My Overtime', 'Tải đơn tăng ca')}</button>
                     {myOvertimeMessage && <div className="note-box">{myOvertimeMessage}</div>}
                     {myOvertimes.length === 0 ? (
                       <p className="small">{t(lang, '目前沒有加班紀錄。', 'No overtime records.', 'Không có bản ghi tăng ca.')}</p>
@@ -1675,11 +1655,7 @@ function App() {
                           {leave.status === 'voided' && <><p>{t(lang, '作廢人員', 'Voided By', 'Người hủy')}：{leave.voided_by_name || '-'}</p><p>{t(lang, '作廢原因', 'Void Reason', 'Lý do hủy')}：{leave.void_reason || '-'}</p></>}
                           {leave.status === 'cancelled' && <><p>{t(lang, '取消人員', 'Cancelled By', 'Người hủy bỏ')}：{leave.cancelled_by_name || '-'}</p><p>{t(lang, '取消原因', 'Cancel Reason', 'Lý do hủy bỏ')}：{leave.cancel_reason || '-'}</p><p>{t(lang, '取消時間', 'Cancelled At', 'Thời gian hủy bỏ')}：{leave.cancelled_at || '-'}</p></>}
                         </div>
-                        {leave.status !== 'voided' && (
-                          <div className="approval-actions">
-                            <button className="reject-btn" onClick={() => handleVoidLeave(leave.id)}>{t(lang, '作廢', 'Void', 'Hủy')}</button>
-                          </div>
-                        )}
+                        {leave.status !== 'voided' && <div className="approval-actions"><button className="reject-btn" onClick={() => handleVoidLeave(leave.id)}>{t(lang, '作廢', 'Void', 'Hủy')}</button></div>}
                       </div>
                     ))}
                   </div></>}
