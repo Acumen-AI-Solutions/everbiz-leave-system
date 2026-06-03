@@ -509,37 +509,68 @@ async function handleRequest(request, env) {
     return jsonResponse({ ok: true, overtimes: result.results || [] })
   }
 
-  // ----- 待審核列表：只列出目前指定審核人的單 -----
+  // ========== 待審核列表（支援代理人：主管本人、第一代理、第二代理） ==========
   if (method === 'GET' && path === '/api/leave/pending') {
     const approverNo = url.searchParams.get('approver_no')
-    if (!approverNo) return jsonResponse({ ok: false, message: '缺少 approver_no' }, 400)
+    if (!approverNo) {
+      return jsonResponse({ ok: false, message: '缺少 approver_no' }, 400)
+    }
     const normalized = approverNo.trim().toUpperCase()
 
+    // 請假
     const leaves = await env.DB.prepare(`
-      SELECT * FROM leave_requests
-      WHERE status = 'pending' AND current_approver_no = ?
-      ORDER BY created_at DESC
-    `).bind(normalized).all()
+      SELECT lr.*
+      FROM leave_requests lr
+      LEFT JOIN employees e ON lr.current_approver_no = e.employee_no
+      WHERE
+        lr.status = 'pending'
+        AND (
+          lr.current_approver_no = ?
+          OR e.first_proxy_no = ?
+          OR e.second_proxy_no = ?
+        )
+      ORDER BY lr.created_at DESC
+    `).bind(normalized, normalized, normalized).all()
+
+    // 補卡
     const punches = await env.DB.prepare(`
-      SELECT * FROM punch_requests
-      WHERE status = 'pending' AND current_approver_no = ?
-      ORDER BY created_at DESC
-    `).bind(normalized).all()
+      SELECT pr.*
+      FROM punch_requests pr
+      LEFT JOIN employees e ON pr.current_approver_no = e.employee_no
+      WHERE
+        pr.status = 'pending'
+        AND (
+          pr.current_approver_no = ?
+          OR e.first_proxy_no = ?
+          OR e.second_proxy_no = ?
+        )
+      ORDER BY pr.created_at DESC
+    `).bind(normalized, normalized, normalized).all()
+
+    // 加班
     const overtimes = await env.DB.prepare(`
-      SELECT * FROM overtime_requests
-      WHERE status = 'pending' AND current_approver_no = ?
-      ORDER BY created_at DESC
-    `).bind(normalized).all()
+      SELECT ot.*
+      FROM overtime_requests ot
+      LEFT JOIN employees e ON ot.current_approver_no = e.employee_no
+      WHERE
+        ot.status = 'pending'
+        AND (
+          ot.current_approver_no = ?
+          OR e.first_proxy_no = ?
+          OR e.second_proxy_no = ?
+        )
+      ORDER BY ot.created_at DESC
+    `).bind(normalized, normalized, normalized).all()
 
     return jsonResponse({
       ok: true,
-      leaves: leaves.results,
-      punches: punches.results,
-      overtimes: overtimes.results
+      leaves: leaves.results || [],
+      punches: punches.results || [],
+      overtimes: overtimes.results || []
     })
   }
 
-  // ========== 請假審核 ==========
+  // ========== 請假審核（支援代理人權限） ==========
   if (method === 'POST' && path === '/api/leave/approve') {
     const body = await request.json()
     const leaveId = Number(body.leave_id || 0)
@@ -548,10 +579,20 @@ async function handleRequest(request, env) {
     if (!leaveId || !approverNo || !action) return jsonResponse({ ok: false, message: '缺少必要欄位' }, 400)
     if (!['approved', 'rejected'].includes(action)) return jsonResponse({ ok: false, message: 'action 只能為 approved 或 rejected' }, 400)
 
+    // 查詢假單，同時檢查權限：本人或代理人均可
     const leave = await env.DB.prepare(`
-      SELECT * FROM leave_requests
-      WHERE id = ? AND status = 'pending' AND current_approver_no = ?
-    `).bind(leaveId, approverNo).first()
+      SELECT lr.*
+      FROM leave_requests lr
+      LEFT JOIN employees e ON lr.current_approver_no = e.employee_no
+      WHERE
+        lr.id = ?
+        AND lr.status = 'pending'
+        AND (
+          lr.current_approver_no = ?
+          OR e.first_proxy_no = ?
+          OR e.second_proxy_no = ?
+        )
+    `).bind(leaveId, approverNo, approverNo, approverNo).first()
     if (!leave) return jsonResponse({ ok: false, message: '無待審核假單或無權限' }, 404)
 
     const now = getTaiwanTimeString()
@@ -579,7 +620,7 @@ async function handleRequest(request, env) {
     }
   }
 
-  // ========== 補卡審核 ==========
+  // ========== 補卡審核（支援代理人權限） ==========
   if (method === 'POST' && path === '/api/punch/action') {
     const body = await request.json()
     const punchId = Number(body.punch_request_id || 0)
@@ -588,12 +629,21 @@ async function handleRequest(request, env) {
     if (!punchId || !approverNo || !action) return jsonResponse({ ok: false, message: '缺少必要欄位' }, 400)
     if (!['approved', 'rejected'].includes(action)) return jsonResponse({ ok: false, message: 'action 只能為 approved 或 rejected' }, 400)
 
+    // 查詢補卡單，同時檢查權限（本人或代理人），並保留申請人的主管資訊以備轉交
     const punch = await env.DB.prepare(`
-      SELECT p.*, e.direct_manager_no, e.direct_manager_name
+      SELECT p.*, applicant.direct_manager_no, applicant.direct_manager_name
       FROM punch_requests p
-      JOIN employees e ON p.employee_no = e.employee_no
-      WHERE p.id = ? AND p.status = 'pending' AND p.current_approver_no = ?
-    `).bind(punchId, approverNo).first()
+      JOIN employees applicant ON p.employee_no = applicant.employee_no
+      LEFT JOIN employees e ON p.current_approver_no = e.employee_no
+      WHERE
+        p.id = ?
+        AND p.status = 'pending'
+        AND (
+          p.current_approver_no = ?
+          OR e.first_proxy_no = ?
+          OR e.second_proxy_no = ?
+        )
+    `).bind(punchId, approverNo, approverNo, approverNo).first()
     if (!punch) return jsonResponse({ ok: false, message: '無待審核補卡單或無權限' }, 404)
 
     const now = getTaiwanTimeString()
@@ -623,7 +673,7 @@ async function handleRequest(request, env) {
     return jsonResponse({ ok: false, message: '未知的審核階段' }, 400)
   }
 
-  // ========== 加班審核 ==========
+  // ========== 加班審核（支援代理人權限） ==========
   if (method === 'POST' && path === '/api/overtime/action') {
     const body = await request.json()
     const overtimeId = Number(body.overtime_request_id || 0)
@@ -632,12 +682,21 @@ async function handleRequest(request, env) {
     if (!overtimeId || !approverNo || !action) return jsonResponse({ ok: false, message: '缺少必要欄位' }, 400)
     if (!['approved', 'rejected'].includes(action)) return jsonResponse({ ok: false, message: 'action 只能為 approved 或 rejected' }, 400)
 
+    // 查詢加班單，同時檢查權限（本人或代理人），並保留申請人的主管資訊以備轉交
     const overtime = await env.DB.prepare(`
-      SELECT o.*, e.direct_manager_no, e.direct_manager_name
+      SELECT o.*, applicant.direct_manager_no, applicant.direct_manager_name
       FROM overtime_requests o
-      JOIN employees e ON o.employee_no = e.employee_no
-      WHERE o.id = ? AND o.status = 'pending' AND o.current_approver_no = ?
-    `).bind(overtimeId, approverNo).first()
+      JOIN employees applicant ON o.employee_no = applicant.employee_no
+      LEFT JOIN employees e ON o.current_approver_no = e.employee_no
+      WHERE
+        o.id = ?
+        AND o.status = 'pending'
+        AND (
+          o.current_approver_no = ?
+          OR e.first_proxy_no = ?
+          OR e.second_proxy_no = ?
+        )
+    `).bind(overtimeId, approverNo, approverNo, approverNo).first()
     if (!overtime) return jsonResponse({ ok: false, message: '無待審核加班單或無權限' }, 404)
 
     const now = getTaiwanTimeString()
