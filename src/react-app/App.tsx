@@ -1,10 +1,7 @@
 import { useState, useEffect } from 'react'
 import './App.css'
 
-const API_BASE =
-  window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    ? 'https://everbiz-leave-system.imd13.workers.dev'
-    : ''
+const API_BASE = 'https://everbiz-leave-api.imd13.workers.dev'
 
 type Employee = {
   employee_no: string
@@ -17,7 +14,6 @@ type Employee = {
   is_active: number
 }
 
-// 完整員工資料（HR 使用，含代理人、PIN 等）
 type FullEmployee = {
   employee_no: string
   employee_name: string
@@ -1152,7 +1148,11 @@ function App() {
             <button type="button" onClick={() => { setActiveSection('form'); setActiveForm('overtime') }}>
               {t(lang, '加班申請', 'Overtime Request', 'Đơn tăng ca')}
             </button>
-            {canApprove && <button type="button" onClick={() => setActiveSection('approvals')}>{t(lang, '待審核', 'Pending Approval', 'Chờ duyệt')}</button>}
+            {canApprove && (
+              <button type="button" onClick={() => setActiveSection('approvals')}>
+                {t(lang, '待審核 / 代理審核', 'Pending / Proxy Approval', 'Chờ duyệt / Duyệt thay')}
+              </button>
+            )}
             {canViewHrReport && <button type="button" onClick={() => setActiveSection('hr')}>{t(lang, 'HR報表', 'HR Report', 'Báo cáo nhân sự')}</button>}
             {canManageEmployees && (
               <button type="button" onClick={() => { setActiveSection('employees'); loadHrEmployees(); resetEmployeeForm() }}>
@@ -1307,7 +1307,7 @@ function App() {
             </section>
           )}
 
-          {/* 表單區塊（請假/補卡/加班/我的紀錄/待審核/HR報表）與原始完全一致 */}
+          {/* 表單區塊（請假/補卡/加班/我的紀錄） */}
           {activeSection === 'form' && (
             <>
               <section className="card result-card">
@@ -1550,7 +1550,7 @@ function App() {
 
           {activeSection === 'approvals' && canApprove && (
             <section className="card result-card">
-              <h2>{t(lang, '主管待審核', 'Manager Pending Approval', 'Quản lý chờ duyệt')}</h2>
+              <h2>{t(lang, '待審核 / 代理審核', 'Pending / Proxy Approval', 'Chờ duyệt / Duyệt thay')}</h2>
               <div className="approval-search">
                 <input value={approverNo} readOnly placeholder={t(lang, '主管工號，例如 E010', 'Manager No., e.g. E010', 'Mã quản lý, ví dụ E010')} />
                 <button className="submit-btn" onClick={loadPendingApprovals} disabled={isLoadingApprovals}>{isLoadingApprovals ? t(lang, '查詢中...', 'Loading...', 'Đang tải...') : t(lang, '查詢待審核', 'Load Pending', 'Tải danh sách chờ')}</button>
