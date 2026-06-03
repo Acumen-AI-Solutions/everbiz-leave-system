@@ -477,3 +477,29 @@ input[readonly] {
     width: 100%;
   }
 }
+.employee-active-row {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+}
+
+.employee-active-row label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #0f2f3f;
+}
+
+.employee-form-actions {
+  margin-top: 18px;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 12px;
+}
+
+.employee-form-actions button {
+  min-width: 72px;
+}
