@@ -1251,9 +1251,9 @@ function App() {
                     <div className="note-box">
                       {t(
                         lang,
-                        '代理人設定說明：請編輯「主管本人」來設定代理人。例如要讓 E001 代理 E010 審核，請編輯 E010，並把第一代理人填 E001。',
-                        'Proxy setup note: edit the original approver to assign proxies. For example, to let E001 approve on behalf of E010, edit E010 and set E001 as the 1st proxy.',
-                        'Ghi chú: hãy chỉnh người duyệt gốc để đặt người duyệt thay. Ví dụ E001 duyệt thay E010 thì chỉnh E010 và đặt E001 là người duyệt thay 1.'
+                        '填寫說明：上方「此員工的審核主管」代表此員工送出請假、補卡、加班時，由誰審核。下方「第一代理人 / 第二代理人」代表當此員工本身是主管時，誰可以代理此員工去核准別人的申請。例如要讓 E001 代理陳主任審核，請編輯陳主任那筆資料，並把第一代理人填 E001。',
+                        'Input note: “This employee’s approver” means who approves this employee’s leave, punch, or overtime requests. “1st / 2nd proxy” means who can approve on behalf of this employee when this employee is an approver. For example, to let E001 approve on behalf of Manager Chen, edit Manager Chen’s employee record and set E001 as the 1st proxy.',
+                        'Ghi chú: “Người duyệt của nhân viên này” là người duyệt đơn nghỉ, chấm công hoặc tăng ca của nhân viên này. “Người duyệt thay 1 / 2” là người có thể duyệt thay khi nhân viên này là người duyệt. Ví dụ muốn E001 duyệt thay quản lý Chen, hãy chỉnh hồ sơ của quản lý Chen và đặt E001 là người duyệt thay 1.'
                       )}
                     </div>
 
@@ -1271,16 +1271,24 @@ function App() {
                       <input type="text" placeholder={t(lang, '登入 PIN 碼', 'Login PIN Code', 'Mã PIN đăng nhập')} value={employeeFormData.pin_code} onChange={e => setEmployeeFormData({ ...employeeFormData, pin_code: e.target.value })} />
                     </div>
 
-                    <div className="two">
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <input type="checkbox" checked={employeeFormData.is_active === 1} onChange={e => setEmployeeFormData({ ...employeeFormData, is_active: e.target.checked ? 1 : 0 })} />
-                        {t(lang, '啟用', 'Active', 'Kích hoạt')}
+                    <div className="employee-active-row">
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={employeeFormData.is_active === 1}
+                          onChange={e => setEmployeeFormData({ ...employeeFormData, is_active: e.target.checked ? 1 : 0 })}
+                        />
+                        {t(lang, '啟用此員工帳號', 'Activate this employee account', 'Kích hoạt tài khoản nhân viên này')}
                       </label>
                     </div>
 
-                    <div className="approval-actions" style={{ marginTop: '16px' }}>
-                      <button type="submit" className="approve-btn">{t(lang, '儲存', 'Save', 'Lưu')}</button>
-                      <button type="button" className="reject-btn" onClick={() => { resetEmployeeForm(); setShowEmployeeForm(false) }}>{t(lang, '取消', 'Cancel', 'Hủy')}</button>
+                    <div className="employee-form-actions">
+                      <button type="submit" className="approve-btn">
+                        {t(lang, '儲存', 'Save', 'Lưu')}
+                      </button>
+                      <button type="button" className="reject-btn" onClick={() => { resetEmployeeForm(); setShowEmployeeForm(false) }}>
+                        {t(lang, '取消', 'Cancel', 'Hủy')}
+                      </button>
                     </div>
                   </form>
                 </div>
