@@ -684,9 +684,9 @@ function App() {
         return
       }
       setPunchMessage(t(lang,
-        `補卡申請已送出，等待 ${data.current_approver_name} / ${data.current_approver_no} 審核。`,
-        `Punch correction submitted. Awaiting approval from ${data.current_approver_name} / ${data.current_approver_no}.`,
-        `Đơn bổ sung chấm công đã gửi. Chờ duyệt từ ${data.current_approver_name} / ${data.current_approver_no}.`
+        `補卡申請已送出，等待 ${approverLabel(data.current_approver_no, data.current_approver_name)} 審核。`,
+        `Punch correction submitted. Awaiting approval from ${approverLabel(data.current_approver_no, data.current_approver_name)}.`,
+        `Đơn bổ sung chấm công đã gửi. Chờ duyệt từ ${approverLabel(data.current_approver_no, data.current_approver_name)}.`
       ))
       setPunchReason('')
       await loadMyPunches()
@@ -723,9 +723,9 @@ function App() {
         return
       }
       setOvertimeMessage(t(lang,
-        `加班申請已送出，等待 ${data.current_approver_name} / ${data.current_approver_no} 審核。`,
-        `Overtime request submitted. Awaiting approval from ${data.current_approver_name} / ${data.current_approver_no}.`,
-        `Đơn tăng ca đã gửi. Chờ duyệt từ ${data.current_approver_name} / ${data.current_approver_no}.`
+        `加班申請已送出，等待 ${approverLabel(data.current_approver_no, data.current_approver_name)} 審核。`,
+        `Overtime request submitted. Awaiting approval from ${approverLabel(data.current_approver_no, data.current_approver_name)}.`,
+        `Đơn tăng ca đã gửi. Chờ duyệt từ ${approverLabel(data.current_approver_no, data.current_approver_name)}.`
       ))
       setOvertimeReason('')
       await loadMyOvertimes()
@@ -1161,6 +1161,18 @@ function App() {
     }
   }, [currentUser])
 
+  // ==================== Helper: 顯示審核主管 ====================
+  // 用於 JSX 與 template string 兩種場合
+  function approverLabel(approverNo: string, approverName: string): string {
+    return approverNo === 'PROXY'
+      ? t(lang, '第一或第二代理人', '1st or 2nd Proxy', 'Người duyệt thay 1 hoặc 2')
+      : `${approverName} / ${approverNo}`
+  }
+
+  function approverDisplay(approverNo: string, approverName: string): string {
+    return approverLabel(approverNo, approverName)
+  }
+
   // ==================== 渲染（無二次排序） ====================
   return (
     <div className="page">
@@ -1274,17 +1286,17 @@ function App() {
                     </div>
                     <div className="two">
                       <input type="text" placeholder={t(lang, '職等 / 角色', 'Rank / Role', 'Cấp bậc / Vai trò')} value={employeeFormData.rank_type} onChange={e => setEmployeeFormData({ ...employeeFormData, rank_type: e.target.value })} />
-                      <input type="text" placeholder={t(lang, '此員工的審核主管工號', 'This employee’s approver no.', 'Mã người duyệt của nhân viên này')} value={employeeFormData.direct_manager_no} onChange={e => setEmployeeFormData({ ...employeeFormData, direct_manager_no: e.target.value })} />
+                      <input type="text" placeholder={t(lang, '此員工的審核主管工號', 'This employee's approver no.', 'Mã người duyệt của nhân viên này')} value={employeeFormData.direct_manager_no} onChange={e => setEmployeeFormData({ ...employeeFormData, direct_manager_no: e.target.value })} />
                     </div>
                     <div className="two">
-                      <input type="text" placeholder={t(lang, '此員工的審核主管姓名', 'This employee’s approver name', 'Tên người duyệt của nhân viên này')} value={employeeFormData.direct_manager_name} onChange={e => setEmployeeFormData({ ...employeeFormData, direct_manager_name: e.target.value })} />
+                      <input type="text" placeholder={t(lang, '此員工的審核主管姓名', 'This employee's approver name', 'Tên người duyệt của nhân viên này')} value={employeeFormData.direct_manager_name} onChange={e => setEmployeeFormData({ ...employeeFormData, direct_manager_name: e.target.value })} />
                     </div>
                     <div className="note-box">
                       {t(
                         lang,
                         '填寫說明：上方「此員工的審核主管」代表此員工送出請假、補卡、加班時，由誰審核。下方「第一代理人 / 第二代理人」代表當此員工本身是主管時，誰可以代理此員工去核准別人的申請。例如要讓 E001 代理陳主任審核，請編輯陳主任那筆資料，並把第一代理人填 E001。',
-                        'Input note: “This employee’s approver” means who approves this employee’s leave, punch, or overtime requests. “1st / 2nd proxy” means who can approve on behalf of this employee when this employee is an approver. For example, to let E001 approve on behalf of Manager Chen, edit Manager Chen’s employee record and set E001 as the 1st proxy.',
-                        'Ghi chú: “Người duyệt của nhân viên này” là người duyệt đơn nghỉ, chấm công hoặc tăng ca của nhân viên này. “Người duyệt thay 1 / 2” là người có thể duyệt thay khi nhân viên này là người duyệt. Ví dụ muốn E001 duyệt thay quản lý Chen, hãy chỉnh hồ sơ của quản lý Chen và đặt E001 là người duyệt thay 1.'
+                        'Input note: "This employee's approver" means who approves this employee's leave, punch, or overtime requests. "1st / 2nd proxy" means who can approve on behalf of this employee when this employee is an approver. For example, to let E001 approve on behalf of Manager Chen, edit Manager Chen's employee record and set E001 as the 1st proxy.',
+                        'Ghi chú: "Người duyệt của nhân viên này" là người duyệt đơn nghỉ, chấm công hoặc tăng ca của nhân viên này. "Người duyệt thay 1 / 2" là người có thể duyệt thay khi nhân viên này là người duyệt. Ví dụ muốn E001 duyệt thay quản lý Chen, hãy chỉnh hồ sơ của quản lý Chen và đặt E001 là người duyệt thay 1.'
                       )}
                     </div>
                     <div className="two">
@@ -1477,7 +1489,7 @@ function App() {
                     <div><span>{t(lang, '假別', 'Leave Type', 'Loại nghỉ')}</span><strong>{result.leaveType}</strong></div>
                     <div><span>{t(lang, '期間', 'Period', 'Thời gian')}</span><strong>{result.startDate} {result.startTime} ~ {result.endDate} {result.endTime}</strong></div>
                     <div><span>{t(lang, '時數', 'Hours', 'Số giờ')}</span><strong>{result.totalHours} {t(lang, '小時', 'hr(s)', 'giờ')}</strong></div>
-                    <div><span>{t(lang, '目前審核主管', 'Current Approver', 'Người phê duyệt')}</span><strong>{result.currentApproverName} / {result.currentApproverNo}</strong></div>
+                    <div><span>{t(lang, '目前審核主管', 'Current Approver', 'Người phê duyệt')}</span><strong>{approverDisplay(result.currentApproverNo, result.currentApproverName)}</strong></div>
                   </div>
                   <p className="small">
                     {result.totalHours > 24
@@ -1511,7 +1523,7 @@ function App() {
                               <p>{t(lang, '日期', 'Date', 'Ngày')}：{leave.start_date} {leave.start_time || ''} ~ {leave.end_date} {leave.end_time || ''}</p>
                               <p>{t(lang, '時數', 'Hours', 'Số giờ')}：{leave.total_hours ?? '-'} {t(lang, '小時', 'hr(s)', 'giờ')}</p>
                               <p>{t(lang, '原因', 'Reason', 'Lý do')}：{leave.reason || t(lang, '未填寫', 'N/A', 'Chưa điền')}</p>
-                              <p>{t(lang, '審核主管', 'Approver', 'Người duyệt')}：{leave.current_approver_name} / {leave.current_approver_no}</p>
+                              <p>{t(lang, '審核主管', 'Approver', 'Người duyệt')}：{approverDisplay(leave.current_approver_no, leave.current_approver_name)}</p>
                               <p>{t(lang, '建立時間', 'Created At', 'Thời gian tạo')}：{leave.created_at}</p>
                             </div>
                             {leave.status === 'pending' && (
@@ -1540,7 +1552,7 @@ function App() {
                               <strong>#{punch.id}｜{punch.punch_type}｜{statusText(punch.status, lang)}</strong>
                               <p>{t(lang, '補卡時間', 'Punch Time', 'Giờ chấm công')}：{punch.punch_date} {punch.punch_time}</p>
                               <p>{t(lang, '原因', 'Reason', 'Lý do')}：{punch.reason || t(lang, '未填寫', 'N/A', 'Chưa điền')}</p>
-                              <p>{t(lang, '審核主管', 'Approver', 'Người duyệt')}：{punch.current_approver_name} / {punch.current_approver_no}</p>
+                              <p>{t(lang, '審核主管', 'Approver', 'Người duyệt')}：{approverDisplay(punch.current_approver_no, punch.current_approver_name)}</p>
                               <p>{t(lang, '建立時間', 'Created At', 'Thời gian tạo')}：{punch.created_at}</p>
                             </div>
                           </div>
@@ -1566,7 +1578,7 @@ function App() {
                               <p>{t(lang, '時間', 'Time', 'Thời gian')}：{overtime.start_time} ~ {overtime.end_time}</p>
                               <p>{t(lang, '時數', 'Hours', 'Số giờ')}：{overtime.total_hours} {t(lang, '小時', 'hr(s)', 'giờ')}</p>
                               <p>{t(lang, '原因', 'Reason', 'Lý do')}：{overtime.reason || t(lang, '未填寫', 'N/A', 'Chưa điền')}</p>
-                              <p>{t(lang, '審核主管', 'Approver', 'Người duyệt')}：{overtime.current_approver_name} / {overtime.current_approver_no}</p>
+                              <p>{t(lang, '審核主管', 'Approver', 'Người duyệt')}：{approverDisplay(overtime.current_approver_no, overtime.current_approver_name)}</p>
                               <p>{t(lang, '建立時間', 'Created At', 'Thời gian tạo')}：{overtime.created_at}</p>
                             </div>
                           </div>
@@ -1650,7 +1662,7 @@ function App() {
                           <p>{leave.leave_type}｜{leave.start_date} {leave.start_time || ''} ~ {leave.end_date} {leave.end_time || ''}</p>
                           <p>{t(lang, '時數', 'Hours', 'Số giờ')}：{leave.total_hours ?? '-'} {t(lang, '小時', 'hr(s)', 'giờ')}</p>
                           <p>{t(lang, '原因', 'Reason', 'Lý do')}：{leave.reason || t(lang, '未填寫', 'N/A', 'Chưa điền')}</p>
-                          <p>{t(lang, '審核主管', 'Approver', 'Người duyệt')}：{leave.current_approver_name} / {leave.current_approver_no}</p>
+                          <p>{t(lang, '審核主管', 'Approver', 'Người duyệt')}：{approverDisplay(leave.current_approver_no, leave.current_approver_name)}</p>
                           <p>{t(lang, '建立時間', 'Created At', 'Thời gian tạo')}：{leave.created_at}</p>
                           {leave.status === 'voided' && <><p>{t(lang, '作廢人員', 'Voided By', 'Người hủy')}：{leave.voided_by_name || '-'}</p><p>{t(lang, '作廢原因', 'Void Reason', 'Lý do hủy')}：{leave.void_reason || '-'}</p></>}
                           {leave.status === 'cancelled' && <><p>{t(lang, '取消人員', 'Cancelled By', 'Người hủy bỏ')}：{leave.cancelled_by_name || '-'}</p><p>{t(lang, '取消原因', 'Cancel Reason', 'Lý do hủy bỏ')}：{leave.cancel_reason || '-'}</p><p>{t(lang, '取消時間', 'Cancelled At', 'Thời gian hủy bỏ')}：{leave.cancelled_at || '-'}</p></>}
@@ -1665,7 +1677,7 @@ function App() {
                         <div><strong>#{punch.id}｜{punch.employee_no} {punch.employee_name}｜{statusText(punch.status, lang)}</strong>
                           <p>{punch.punch_type}｜{punch.punch_date} {punch.punch_time}</p>
                           <p>{t(lang, '原因', 'Reason', 'Lý do')}：{punch.reason || t(lang, '未填寫', 'N/A', 'Chưa điền')}</p>
-                          <p>{t(lang, '審核主管', 'Approver', 'Người duyệt')}：{punch.current_approver_name} / {punch.current_approver_no}</p>
+                          <p>{t(lang, '審核主管', 'Approver', 'Người duyệt')}：{approverDisplay(punch.current_approver_no, punch.current_approver_name)}</p>
                           <p>{t(lang, '建立時間', 'Created At', 'Thời gian tạo')}：{punch.created_at}</p>
                         </div>
                       </div>
@@ -1678,7 +1690,7 @@ function App() {
                           <p>{ot.overtime_type}｜{ot.overtime_date} {ot.start_time}~{ot.end_time}</p>
                           <p>{t(lang, '時數', 'Hours', 'Số giờ')}：{ot.total_hours ?? '-'} {t(lang, '小時', 'hr(s)', 'giờ')}</p>
                           <p>{t(lang, '原因', 'Reason', 'Lý do')}：{ot.reason || t(lang, '未填寫', 'N/A', 'Chưa điền')}</p>
-                          <p>{t(lang, '審核主管', 'Approver', 'Người duyệt')}：{ot.current_approver_name} / {ot.current_approver_no}</p>
+                          <p>{t(lang, '審核主管', 'Approver', 'Người duyệt')}：{approverDisplay(ot.current_approver_no, ot.current_approver_name)}</p>
                           <p>{t(lang, '建立時間', 'Created At', 'Thời gian tạo')}：{ot.created_at}</p>
                         </div>
                       </div>
