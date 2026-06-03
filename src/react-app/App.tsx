@@ -325,10 +325,10 @@ function App() {
   const [hrMessage, setHrMessage] = useState('')
   const [isLoadingHrLeaves, setIsLoadingHrLeaves] = useState(false)
 
-  const canApprove =
-    currentUser?.system_role === 'manager' ||
-    currentUser?.system_role === 'general_manager' ||
-    currentUser?.system_role === 'hr'
+  // ========== 修改此處 ==========
+  // 任何已登入使用者皆可看到「待審核 / 代理審核」
+  const canApprove = !!currentUser
+  // ============================
 
   const canViewHrReport =
     currentUser?.system_role === 'hr' ||
