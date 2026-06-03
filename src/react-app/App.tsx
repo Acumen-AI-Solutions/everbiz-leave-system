@@ -228,7 +228,7 @@ function downloadCsv(rows: unknown[][], headers: string[], filename: string) {
   URL.revokeObjectURL(url)
 }
 
-// ========== 新增排序函數 ==========
+// ========== 排序函數 ==========
 function statusOrder(status: string): number {
   if (status === 'approved') return 1
   if (status === 'pending') return 2
@@ -490,7 +490,7 @@ function App() {
     }
   }
 
-  // ----- 登入 -----
+  // ----- 登入（僅設定使用者，清空狀態）-----
   async function handleLogin(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const normalizedEmployeeNo = loginEmployeeNo.trim().toUpperCase()
@@ -532,11 +532,13 @@ function App() {
       setResult(null)
       setPunchMessage('')
       setOvertimeMessage('')
+      setMyPunches([])
+      setMyOvertimes([])
+      setMyPunchMessage('')
+      setMyOvertimeMessage('')
+      setHrEmployeeMessage('')
+      setHrEmployees([])
       setActiveSection('form')
-      await loadEmployees()
-      await loadMyPunches()
-      await loadMyOvertimes()
-      if (canManageEmployees) await loadHrEmployees()
     } catch {
       setLoginError(t(lang, '登入失敗，請確認 API 是否正常', 'Login failed. Please check the API.', 'Đăng nhập thất bại. Vui lòng kiểm tra API.'))
       setCurrentUser(null)
@@ -869,7 +871,7 @@ function App() {
     try {
       const res = await fetch(`${API_BASE}/api/leave/my?employee_no=${encodeURIComponent(currentUser.employee_no)}`)
       const data = await res.json()
-      if (data.ok) setMyLeaves(data.leaves || [])
+      if (data.ok) setMyLeaves(sortByStatus(data.leaves || []))
     } catch { /* silent */ }
   }
 
@@ -885,7 +887,7 @@ function App() {
         setMyLeaves([])
         return
       }
-      setMyLeaves(data.leaves || [])
+      setMyLeaves(sortByStatus(data.leaves || []))
       setMyLeaveMessage(t(lang, `已載入 ${data.leaves?.length || 0} 筆我的假單`, `Loaded ${data.leaves?.length || 0} leave request(s)`, `Đã tải ${data.leaves?.length || 0} đơn nghỉ phép`))
     } catch {
       setMyLeaveMessage(t(lang, '查詢失敗，請確認 API 是否正常', 'Query failed. Please check the API.', 'Truy vấn thất bại. Vui lòng kiểm tra API.'))
@@ -907,7 +909,7 @@ function App() {
         setMyPunches([])
         return
       }
-      setMyPunches(data.punches || [])
+      setMyPunches(sortByStatus(data.punches || []))
       setMyPunchMessage(t(lang, `已載入 ${data.punches?.length || 0} 筆我的補卡`, `Loaded ${data.punches?.length || 0} punch correction(s)`, `Đã tải ${data.punches?.length || 0} đơn chấm công`))
     } catch {
       setMyPunchMessage(t(lang, '查詢失敗，請確認 API 是否正常', 'Query failed. Please check the API.', 'Truy vấn thất bại. Vui lòng kiểm tra API.'))
@@ -929,7 +931,7 @@ function App() {
         setMyOvertimes([])
         return
       }
-      setMyOvertimes(data.overtimes || [])
+      setMyOvertimes(sortByStatus(data.overtimes || []))
       setMyOvertimeMessage(t(lang, `已載入 ${data.overtimes?.length || 0} 筆我的加班`, `Loaded ${data.overtimes?.length || 0} overtime request(s)`, `Đã tải ${data.overtimes?.length || 0} đơn tăng ca`))
     } catch {
       setMyOvertimeMessage(t(lang, '查詢失敗，請確認 API 是否正常', 'Query failed. Please check the API.', 'Truy vấn thất bại. Vui lòng kiểm tra API.'))
@@ -1002,15 +1004,16 @@ function App() {
     }
   }
 
+  // ----- HR 報表 -----
   async function loadHrReportSilent() {
     if (!canViewHrReport) return
     try {
       const res = await fetch(`${API_BASE}/api/hr/report`)
       const data = await res.json()
       if (data.ok) {
-        setHrLeaves(data.leaves || [])
-        setHrPunches(data.punches || [])
-        setHrOvertimes(data.overtimes || [])
+        setHrLeaves(sortByStatus(data.leaves || []))
+        setHrPunches(sortByStatus(data.punches || []))
+        setHrOvertimes(sortByStatus(data.overtimes || []))
       }
     } catch { /* silent */ }
   }
@@ -1028,9 +1031,9 @@ function App() {
         setHrOvertimes([])
         return
       }
-      setHrLeaves(data.leaves || [])
-      setHrPunches(data.punches || [])
-      setHrOvertimes(data.overtimes || [])
+      setHrLeaves(sortByStatus(data.leaves || []))
+      setHrPunches(sortByStatus(data.punches || []))
+      setHrOvertimes(sortByStatus(data.overtimes || []))
       setHrMessage(t(lang,
         `已載入 ${data.leaves?.length || 0} 筆請假、${data.punches?.length || 0} 筆補卡/忘刷、${data.overtimes?.length || 0} 筆加班`,
         `Loaded ${data.leaves?.length || 0} leave, ${data.punches?.length || 0} punch, ${data.overtimes?.length || 0} overtime records`,
@@ -1140,11 +1143,20 @@ function App() {
     setHrMessage(t(lang, `已匯出 ${hrOvertimes.length} 筆加班報表`, `Exported ${hrOvertimes.length} overtime record(s)`, `Đã xuất ${hrOvertimes.length} bản ghi tăng ca`))
   }
 
+  // ----- 登入後自動載入資料 (useEffect) -----
   useEffect(() => {
-    if (currentUser) {
-      loadMyLeavesSilent()
-      loadMyPunches()
-      loadMyOvertimes()
+    if (!currentUser) return
+
+    loadEmployees()
+    loadMyLeavesSilent()
+    loadMyPunches()
+    loadMyOvertimes()
+
+    if (
+      currentUser.system_role === 'hr' ||
+      currentUser.system_role === 'general_manager'
+    ) {
+      loadHrEmployees()
     }
   }, [currentUser])
 
@@ -1463,10 +1475,10 @@ function App() {
                           <td>{emp.employee_name}</td>
                           <td>{emp.position_title}</td>
                           <td>{emp.department_name}</td>
-                        </tr>
+                        </td>
                       ))}
                     </tbody>
-                  <table>
+                  </table>
                 </section>
               </div>
 
@@ -1481,7 +1493,11 @@ function App() {
                     <div><span>{t(lang, '時數', 'Hours', 'Số giờ')}</span><strong>{result.totalHours} {t(lang, '小時', 'hr(s)', 'giờ')}</strong></div>
                     <div><span>{t(lang, '目前審核主管', 'Current Approver', 'Người phê duyệt')}</span><strong>{result.currentApproverName} / {result.currentApproverNo}</strong></div>
                   </div>
-                  <p className="small">{result.totalHours >= 24 ? t(lang, '三天以上請假已直接送交董事長審核，請耐心等候。', 'Leave request for more than 3 days has been sent directly to the Chairman for approval.', 'Đơn nghỉ trên 3 ngày đã được gửi trực tiếp đến Chủ tịch để phê duyệt.') : t(lang, '假單已送出，將由主管審核。', 'Leave request submitted and will be reviewed by your supervisor.', 'Đơn nghỉ đã được gửi và sẽ được quản lý xem xét.')}</p>
+                  <p className="small">
+                    {result.totalHours > 24
+                      ? t(lang, '三天以上請假已直接送交董事長審核，請耐心等候。', 'Leave request for more than 3 days has been sent directly to the Chairman for approval.', 'Đơn nghỉ trên 3 ngày đã được gửi trực tiếp đến Chủ tịch để phê duyệt.')
+                      : t(lang, '假單已送出，將由主管審核。', 'Leave request submitted and will be reviewed by your supervisor.', 'Đơn nghỉ đã được gửi và sẽ được quản lý xem xét.')}
+                  </p>
                 </section>
               )}
 
@@ -1504,7 +1520,7 @@ function App() {
                       <p className="small">{t(lang, '目前沒有請假紀錄。', 'No leave records found.', 'Không có bản ghi nghỉ phép.')}</p>
                     ) : (
                       <div className="approval-list">
-                        {sortByStatus(myLeaves).map(leave => (
+                        {myLeaves.map(leave => (
                           <div className="approval-item" key={leave.id}>
                             <div>
                               <strong>#{leave.id}｜{leave.leave_type}｜{statusText(leave.status, lang)}</strong>
@@ -1536,7 +1552,7 @@ function App() {
                       <p className="small">{t(lang, '目前沒有補卡紀錄。', 'No punch correction records.', 'Không có bản ghi chấm công.')}</p>
                     ) : (
                       <div className="approval-list">
-                        {sortByStatus(myPunches).map(punch => (
+                        {myPunches.map(punch => (
                           <div className="approval-item" key={punch.id}>
                             <div>
                               <strong>#{punch.id}｜{punch.punch_type}｜{statusText(punch.status, lang)}</strong>
@@ -1562,7 +1578,7 @@ function App() {
                       <p className="small">{t(lang, '目前沒有加班紀錄。', 'No overtime records.', 'Không có bản ghi tăng ca.')}</p>
                     ) : (
                       <div className="approval-list">
-                        {sortByStatus(myOvertimes).map(overtime => (
+                        {myOvertimes.map(overtime => (
                           <div className="approval-item" key={overtime.id}>
                             <div>
                               <strong>#{overtime.id}｜{overtime.overtime_type}｜{statusText(overtime.status, lang)}</strong>
@@ -1648,7 +1664,7 @@ function App() {
               {hrLeaves.length === 0 && hrPunches.length === 0 && hrOvertimes.length === 0 ? <p className="small">{t(lang, '目前沒有 HR 報表資料。', 'No HR report records found.', 'Không có dữ liệu báo cáo HR.')}</p> : (
                 <>
                   {hrLeaves.length > 0 && <><h3>{t(lang, '請假報表', 'Leave Report', 'Báo cáo nghỉ phép')}</h3><div className="approval-list">
-                    {sortByStatus(hrLeaves).map(leave => (
+                    {hrLeaves.map(leave => (
                       <div className="approval-item" key={`hr-leave-${leave.id}`}>
                         <div><strong>#{leave.id}｜{leave.employee_no} {leave.employee_name}｜{statusText(leave.status, lang)}</strong>
                           <p>{leave.leave_type}｜{leave.start_date} {leave.start_time || ''} ~ {leave.end_date} {leave.end_time || ''}</p>
@@ -1668,7 +1684,7 @@ function App() {
                     ))}
                   </div></>}
                   {hrPunches.length > 0 && <><h3>{t(lang, '補卡 / 忘刷報表', 'Punch Correction Report', 'Báo cáo bổ sung chấm công')}</h3><div className="approval-list">
-                    {sortByStatus(hrPunches).map(punch => (
+                    {hrPunches.map(punch => (
                       <div className="approval-item" key={`hr-punch-${punch.id}`}>
                         <div><strong>#{punch.id}｜{punch.employee_no} {punch.employee_name}｜{statusText(punch.status, lang)}</strong>
                           <p>{punch.punch_type}｜{punch.punch_date} {punch.punch_time}</p>
@@ -1680,7 +1696,7 @@ function App() {
                     ))}
                   </div></>}
                   {hrOvertimes.length > 0 && <><h3>{t(lang, '加班報表', 'Overtime Report', 'Báo cáo tăng ca')}</h3><div className="approval-list">
-                    {sortByStatus(hrOvertimes).map(ot => (
+                    {hrOvertimes.map(ot => (
                       <div className="approval-item" key={`hr-ot-${ot.id}`}>
                         <div><strong>#{ot.id}｜{ot.employee_no} {ot.employee_name}｜{statusText(ot.status, lang)}</strong>
                           <p>{ot.overtime_type}｜{ot.overtime_date} {ot.start_time}~{ot.end_time}</p>
