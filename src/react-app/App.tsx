@@ -325,10 +325,7 @@ function App() {
   const [hrMessage, setHrMessage] = useState('')
   const [isLoadingHrLeaves, setIsLoadingHrLeaves] = useState(false)
 
-  // ========== 修改此處 ==========
-  // 任何已登入使用者皆可看到「待審核 / 代理審核」
   const canApprove = !!currentUser
-  // ============================
 
   const canViewHrReport =
     currentUser?.system_role === 'hr' ||
@@ -1217,7 +1214,6 @@ function App() {
             <div className="badge">PWA</div>
           </header>
 
-          {/* 員工管理區塊（HR / 總經理可見） */}
           {activeSection === 'employees' && canManageEmployees && (
             <section className="card result-card">
               <h2>{t(lang, '員工資料管理', 'Employee Management', 'Quản lý nhân viên')}</h2>
@@ -1237,32 +1233,51 @@ function App() {
                       <input type="text" placeholder={t(lang, '員工編號 *', 'Employee No. *', 'Mã NV *')} value={employeeFormData.employee_no} onChange={e => setEmployeeFormData({ ...employeeFormData, employee_no: e.target.value })} required />
                       <input type="text" placeholder={t(lang, '姓名 *', 'Name *', 'Tên *')} value={employeeFormData.employee_name} onChange={e => setEmployeeFormData({ ...employeeFormData, employee_name: e.target.value })} required />
                     </div>
+
                     <div className="two">
                       <input type="text" placeholder={t(lang, '部門', 'Department', 'Bộ phận')} value={employeeFormData.department_name} onChange={e => setEmployeeFormData({ ...employeeFormData, department_name: e.target.value })} />
                       <input type="text" placeholder={t(lang, '職稱', 'Position', 'Chức vụ')} value={employeeFormData.position_title} onChange={e => setEmployeeFormData({ ...employeeFormData, position_title: e.target.value })} />
                     </div>
+
                     <div className="two">
-                      <input type="text" placeholder={t(lang, '職等', 'Rank', 'Cấp bậc')} value={employeeFormData.rank_type} onChange={e => setEmployeeFormData({ ...employeeFormData, rank_type: e.target.value })} />
-                      <input type="text" placeholder={t(lang, '直屬主管編號', 'Direct Manager No.', 'Mã quản lý trực tiếp')} value={employeeFormData.direct_manager_no} onChange={e => setEmployeeFormData({ ...employeeFormData, direct_manager_no: e.target.value })} />
+                      <input type="text" placeholder={t(lang, '職等 / 角色', 'Rank / Role', 'Cấp bậc / Vai trò')} value={employeeFormData.rank_type} onChange={e => setEmployeeFormData({ ...employeeFormData, rank_type: e.target.value })} />
+                      <input type="text" placeholder={t(lang, '此員工的審核主管工號', 'This employee’s approver no.', 'Mã người duyệt của nhân viên này')} value={employeeFormData.direct_manager_no} onChange={e => setEmployeeFormData({ ...employeeFormData, direct_manager_no: e.target.value })} />
                     </div>
+
                     <div className="two">
-                      <input type="text" placeholder={t(lang, '直屬主管姓名', 'Direct Manager Name', 'Tên quản lý trực tiếp')} value={employeeFormData.direct_manager_name} onChange={e => setEmployeeFormData({ ...employeeFormData, direct_manager_name: e.target.value })} />
-                      <input type="text" placeholder={t(lang, '第一代理人編號', '1st Proxy No.', 'Mã đại diện 1')} value={employeeFormData.first_proxy_no} onChange={e => setEmployeeFormData({ ...employeeFormData, first_proxy_no: e.target.value })} />
+                      <input type="text" placeholder={t(lang, '此員工的審核主管姓名', 'This employee’s approver name', 'Tên người duyệt của nhân viên này')} value={employeeFormData.direct_manager_name} onChange={e => setEmployeeFormData({ ...employeeFormData, direct_manager_name: e.target.value })} />
                     </div>
+
+                    <div className="note-box">
+                      {t(
+                        lang,
+                        '代理人設定說明：請編輯「主管本人」來設定代理人。例如要讓 E001 代理 E010 審核，請編輯 E010，並把第一代理人填 E001。',
+                        'Proxy setup note: edit the original approver to assign proxies. For example, to let E001 approve on behalf of E010, edit E010 and set E001 as the 1st proxy.',
+                        'Ghi chú: hãy chỉnh người duyệt gốc để đặt người duyệt thay. Ví dụ E001 duyệt thay E010 thì chỉnh E010 và đặt E001 là người duyệt thay 1.'
+                      )}
+                    </div>
+
                     <div className="two">
-                      <input type="text" placeholder={t(lang, '第一代理人姓名', '1st Proxy Name', 'Tên đại diện 1')} value={employeeFormData.first_proxy_name} onChange={e => setEmployeeFormData({ ...employeeFormData, first_proxy_name: e.target.value })} />
-                      <input type="text" placeholder={t(lang, '第二代理人編號', '2nd Proxy No.', 'Mã đại diện 2')} value={employeeFormData.second_proxy_no} onChange={e => setEmployeeFormData({ ...employeeFormData, second_proxy_no: e.target.value })} />
+                      <input type="text" placeholder={t(lang, '可代理此員工審核的第一代理人工號', '1st proxy approver no. for this employee', 'Mã người duyệt thay 1')} value={employeeFormData.first_proxy_no} onChange={e => setEmployeeFormData({ ...employeeFormData, first_proxy_no: e.target.value })} />
+                      <input type="text" placeholder={t(lang, '可代理此員工審核的第一代理人姓名', '1st proxy approver name for this employee', 'Tên người duyệt thay 1')} value={employeeFormData.first_proxy_name} onChange={e => setEmployeeFormData({ ...employeeFormData, first_proxy_name: e.target.value })} />
                     </div>
+
                     <div className="two">
-                      <input type="text" placeholder={t(lang, '第二代理人姓名', '2nd Proxy Name', 'Tên đại diện 2')} value={employeeFormData.second_proxy_name} onChange={e => setEmployeeFormData({ ...employeeFormData, second_proxy_name: e.target.value })} />
-                      <input type="text" placeholder={t(lang, 'PIN碼', 'PIN Code', 'Mã PIN')} value={employeeFormData.pin_code} onChange={e => setEmployeeFormData({ ...employeeFormData, pin_code: e.target.value })} />
+                      <input type="text" placeholder={t(lang, '可代理此員工審核的第二代理人工號', '2nd proxy approver no. for this employee', 'Mã người duyệt thay 2')} value={employeeFormData.second_proxy_no} onChange={e => setEmployeeFormData({ ...employeeFormData, second_proxy_no: e.target.value })} />
+                      <input type="text" placeholder={t(lang, '可代理此員工審核的第二代理人姓名', '2nd proxy approver name for this employee', 'Tên người duyệt thay 2')} value={employeeFormData.second_proxy_name} onChange={e => setEmployeeFormData({ ...employeeFormData, second_proxy_name: e.target.value })} />
                     </div>
+
+                    <div className="two">
+                      <input type="text" placeholder={t(lang, '登入 PIN 碼', 'Login PIN Code', 'Mã PIN đăng nhập')} value={employeeFormData.pin_code} onChange={e => setEmployeeFormData({ ...employeeFormData, pin_code: e.target.value })} />
+                    </div>
+
                     <div className="two">
                       <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <input type="checkbox" checked={employeeFormData.is_active === 1} onChange={e => setEmployeeFormData({ ...employeeFormData, is_active: e.target.checked ? 1 : 0 })} />
                         {t(lang, '啟用', 'Active', 'Kích hoạt')}
                       </label>
                     </div>
+
                     <div className="approval-actions" style={{ marginTop: '16px' }}>
                       <button type="submit" className="approve-btn">{t(lang, '儲存', 'Save', 'Lưu')}</button>
                       <button type="button" className="reject-btn" onClick={() => { resetEmployeeForm(); setShowEmployeeForm(false) }}>{t(lang, '取消', 'Cancel', 'Hủy')}</button>
@@ -1433,18 +1448,9 @@ function App() {
                     <div><span>{t(lang, '假單編號', 'Request ID', 'Mã đơn')}</span><strong>{result.leaveRequestId || '-'}</strong></div>
                     <div><span>{t(lang, '員工', 'Employee', 'Nhân viên')}</span><strong>{result.employeeNo} {result.employeeName}</strong></div>
                     <div><span>{t(lang, '假別', 'Leave Type', 'Loại nghỉ')}</span><strong>{result.leaveType}</strong></div>
-                    <div>
-                      <span>{t(lang, '期間', 'Period', 'Thời gian')}</span>
-                      <strong>{result.startDate} {result.startTime} ~ {result.endDate} {result.endTime}</strong>
-                    </div>
-                    <div>
-                      <span>{t(lang, '時數', 'Hours', 'Số giờ')}</span>
-                      <strong>{result.totalHours} {t(lang, '小時', 'hr(s)', 'giờ')}</strong>
-                    </div>
-                    <div>
-                      <span>{t(lang, '目前審核主管', 'Current Approver', 'Người phê duyệt')}</span>
-                      <strong>{result.currentApproverName} / {result.currentApproverNo}</strong>
-                    </div>
+                    <div><span>{t(lang, '期間', 'Period', 'Thời gian')}</span><strong>{result.startDate} {result.startTime} ~ {result.endDate} {result.endTime}</strong></div>
+                    <div><span>{t(lang, '時數', 'Hours', 'Số giờ')}</span><strong>{result.totalHours} {t(lang, '小時', 'hr(s)', 'giờ')}</strong></div>
+                    <div><span>{t(lang, '目前審核主管', 'Current Approver', 'Người phê duyệt')}</span><strong>{result.currentApproverName} / {result.currentApproverNo}</strong></div>
                   </div>
                   <p className="small">{result.totalHours >= 24 ? t(lang, '三天以上請假已直接送交董事長審核，請耐心等候。', 'Leave request for more than 3 days has been sent directly to the Chairman for approval.', 'Đơn nghỉ trên 3 ngày đã được gửi trực tiếp đến Chủ tịch để phê duyệt.') : t(lang, '假單已送出，將由主管審核。', 'Leave request submitted and will be reviewed by your supervisor.', 'Đơn nghỉ đã được gửi và sẽ được quản lý xem xét.')}</p>
                 </section>
