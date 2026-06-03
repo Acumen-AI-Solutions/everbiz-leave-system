@@ -228,6 +228,27 @@ function downloadCsv(rows: unknown[][], headers: string[], filename: string) {
   URL.revokeObjectURL(url)
 }
 
+// ========== 新增排序函數 ==========
+function statusOrder(status: string): number {
+  if (status === 'approved') return 1
+  if (status === 'pending') return 2
+  if (status === 'cancelled') return 3
+  if (status === 'voided') return 4
+  if (status === 'rejected') return 5
+  return 99
+}
+
+function sortByStatus<T extends { status: string; updated_at?: string; created_at?: string }>(items: T[]): T[] {
+  return [...items].sort((a, b) => {
+    const orderDiff = statusOrder(a.status) - statusOrder(b.status)
+    if (orderDiff !== 0) return orderDiff
+    const timeA = new Date(a.updated_at || a.created_at || '').getTime()
+    const timeB = new Date(b.updated_at || b.created_at || '').getTime()
+    return timeB - timeA
+  })
+}
+// =================================
+
 function App() {
   const [loginEmployeeNo, setLoginEmployeeNo] = useState('')
   const [pinCode, setPinCode] = useState('')
@@ -576,7 +597,6 @@ function App() {
       setResult(null)
       return
     }
-    // 修改處：嚴格大於 24 小時才送出董事長確認訊息（三天以上）
     if (totalHours > 24) {
       const confirmMsg = t(lang,
         '您申請的請假時數超過三天，主管核准後將再送董事長審核，確定送出嗎？',
@@ -1446,7 +1466,7 @@ function App() {
                         </tr>
                       ))}
                     </tbody>
-                  </table>
+                  <table>
                 </section>
               </div>
 
@@ -1484,7 +1504,7 @@ function App() {
                       <p className="small">{t(lang, '目前沒有請假紀錄。', 'No leave records found.', 'Không có bản ghi nghỉ phép.')}</p>
                     ) : (
                       <div className="approval-list">
-                        {myLeaves.map(leave => (
+                        {sortByStatus(myLeaves).map(leave => (
                           <div className="approval-item" key={leave.id}>
                             <div>
                               <strong>#{leave.id}｜{leave.leave_type}｜{statusText(leave.status, lang)}</strong>
@@ -1516,7 +1536,7 @@ function App() {
                       <p className="small">{t(lang, '目前沒有補卡紀錄。', 'No punch correction records.', 'Không có bản ghi chấm công.')}</p>
                     ) : (
                       <div className="approval-list">
-                        {myPunches.map(punch => (
+                        {sortByStatus(myPunches).map(punch => (
                           <div className="approval-item" key={punch.id}>
                             <div>
                               <strong>#{punch.id}｜{punch.punch_type}｜{statusText(punch.status, lang)}</strong>
@@ -1542,7 +1562,7 @@ function App() {
                       <p className="small">{t(lang, '目前沒有加班紀錄。', 'No overtime records.', 'Không có bản ghi tăng ca.')}</p>
                     ) : (
                       <div className="approval-list">
-                        {myOvertimes.map(overtime => (
+                        {sortByStatus(myOvertimes).map(overtime => (
                           <div className="approval-item" key={overtime.id}>
                             <div>
                               <strong>#{overtime.id}｜{overtime.overtime_type}｜{statusText(overtime.status, lang)}</strong>
@@ -1628,24 +1648,47 @@ function App() {
               {hrLeaves.length === 0 && hrPunches.length === 0 && hrOvertimes.length === 0 ? <p className="small">{t(lang, '目前沒有 HR 報表資料。', 'No HR report records found.', 'Không có dữ liệu báo cáo HR.')}</p> : (
                 <>
                   {hrLeaves.length > 0 && <><h3>{t(lang, '請假報表', 'Leave Report', 'Báo cáo nghỉ phép')}</h3><div className="approval-list">
-                    {hrLeaves.map(leave => (
+                    {sortByStatus(hrLeaves).map(leave => (
                       <div className="approval-item" key={`hr-leave-${leave.id}`}>
-                        <div><strong>#{leave.id}｜{leave.employee_no} {leave.employee_name}｜{statusText(leave.status, lang)}</strong><p>{leave.leave_type}｜{leave.start_date} {leave.start_time || ''} ~ {leave.end_date} {leave.end_time || ''}</p><p>{t(lang, '時數', 'Hours', 'Số giờ')}：{leave.total_hours ?? '-'} {t(lang, '小時', 'hr(s)', 'giờ')}</p><p>{t(lang, '原因', 'Reason', 'Lý do')}：{leave.reason || t(lang, '未填寫', 'N/A', 'Chưa điền')}</p><p>{t(lang, '審核主管', 'Approver', 'Người duyệt')}：{leave.current_approver_name} / {leave.current_approver_no}</p><p>{t(lang, '建立時間', 'Created At', 'Thời gian tạo')}：{leave.created_at}</p>{leave.status === 'voided' && <><p>{t(lang, '作廢人員', 'Voided By', 'Người hủy')}：{leave.voided_by_name || '-'}</p><p>{t(lang, '作廢原因', 'Void Reason', 'Lý do hủy')}：{leave.void_reason || '-'}</p></>}{leave.status === 'cancelled' && <><p>{t(lang, '取消人員', 'Cancelled By', 'Người hủy bỏ')}：{leave.cancelled_by_name || '-'}</p><p>{t(lang, '取消原因', 'Cancel Reason', 'Lý do hủy bỏ')}：{leave.cancel_reason || '-'}</p><p>{t(lang, '取消時間', 'Cancelled At', 'Thời gian hủy bỏ')}：{leave.cancelled_at || '-'}</p></>}</div>
-                        {leave.status !== 'voided' && <div className="approval-actions"><button className="reject-btn" onClick={() => handleVoidLeave(leave.id)}>{t(lang, '作廢', 'Void', 'Hủy')}</button></div>}
+                        <div><strong>#{leave.id}｜{leave.employee_no} {leave.employee_name}｜{statusText(leave.status, lang)}</strong>
+                          <p>{leave.leave_type}｜{leave.start_date} {leave.start_time || ''} ~ {leave.end_date} {leave.end_time || ''}</p>
+                          <p>{t(lang, '時數', 'Hours', 'Số giờ')}：{leave.total_hours ?? '-'} {t(lang, '小時', 'hr(s)', 'giờ')}</p>
+                          <p>{t(lang, '原因', 'Reason', 'Lý do')}：{leave.reason || t(lang, '未填寫', 'N/A', 'Chưa điền')}</p>
+                          <p>{t(lang, '審核主管', 'Approver', 'Người duyệt')}：{leave.current_approver_name} / {leave.current_approver_no}</p>
+                          <p>{t(lang, '建立時間', 'Created At', 'Thời gian tạo')}：{leave.created_at}</p>
+                          {leave.status === 'voided' && <><p>{t(lang, '作廢人員', 'Voided By', 'Người hủy')}：{leave.voided_by_name || '-'}</p><p>{t(lang, '作廢原因', 'Void Reason', 'Lý do hủy')}：{leave.void_reason || '-'}</p></>}
+                          {leave.status === 'cancelled' && <><p>{t(lang, '取消人員', 'Cancelled By', 'Người hủy bỏ')}：{leave.cancelled_by_name || '-'}</p><p>{t(lang, '取消原因', 'Cancel Reason', 'Lý do hủy bỏ')}：{leave.cancel_reason || '-'}</p><p>{t(lang, '取消時間', 'Cancelled At', 'Thời gian hủy bỏ')}：{leave.cancelled_at || '-'}</p></>}
+                        </div>
+                        {leave.status !== 'voided' && (
+                          <div className="approval-actions">
+                            <button className="reject-btn" onClick={() => handleVoidLeave(leave.id)}>{t(lang, '作廢', 'Void', 'Hủy')}</button>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div></>}
                   {hrPunches.length > 0 && <><h3>{t(lang, '補卡 / 忘刷報表', 'Punch Correction Report', 'Báo cáo bổ sung chấm công')}</h3><div className="approval-list">
-                    {hrPunches.map(punch => (
+                    {sortByStatus(hrPunches).map(punch => (
                       <div className="approval-item" key={`hr-punch-${punch.id}`}>
-                        <div><strong>#{punch.id}｜{punch.employee_no} {punch.employee_name}｜{statusText(punch.status, lang)}</strong><p>{punch.punch_type}｜{punch.punch_date} {punch.punch_time}</p><p>{t(lang, '原因', 'Reason', 'Lý do')}：{punch.reason || t(lang, '未填寫', 'N/A', 'Chưa điền')}</p><p>{t(lang, '審核主管', 'Approver', 'Người duyệt')}：{punch.current_approver_name} / {punch.current_approver_no}</p><p>{t(lang, '建立時間', 'Created At', 'Thời gian tạo')}：{punch.created_at}</p></div>
+                        <div><strong>#{punch.id}｜{punch.employee_no} {punch.employee_name}｜{statusText(punch.status, lang)}</strong>
+                          <p>{punch.punch_type}｜{punch.punch_date} {punch.punch_time}</p>
+                          <p>{t(lang, '原因', 'Reason', 'Lý do')}：{punch.reason || t(lang, '未填寫', 'N/A', 'Chưa điền')}</p>
+                          <p>{t(lang, '審核主管', 'Approver', 'Người duyệt')}：{punch.current_approver_name} / {punch.current_approver_no}</p>
+                          <p>{t(lang, '建立時間', 'Created At', 'Thời gian tạo')}：{punch.created_at}</p>
+                        </div>
                       </div>
                     ))}
                   </div></>}
                   {hrOvertimes.length > 0 && <><h3>{t(lang, '加班報表', 'Overtime Report', 'Báo cáo tăng ca')}</h3><div className="approval-list">
-                    {hrOvertimes.map(ot => (
+                    {sortByStatus(hrOvertimes).map(ot => (
                       <div className="approval-item" key={`hr-ot-${ot.id}`}>
-                        <div><strong>#{ot.id}｜{ot.employee_no} {ot.employee_name}｜{statusText(ot.status, lang)}</strong><p>{ot.overtime_type}｜{ot.overtime_date} {ot.start_time}~{ot.end_time}</p><p>{t(lang, '時數', 'Hours', 'Số giờ')}：{ot.total_hours ?? '-'} {t(lang, '小時', 'hr(s)', 'giờ')}</p><p>{t(lang, '原因', 'Reason', 'Lý do')}：{ot.reason || t(lang, '未填寫', 'N/A', 'Chưa điền')}</p><p>{t(lang, '審核主管', 'Approver', 'Người duyệt')}：{ot.current_approver_name} / {ot.current_approver_no}</p><p>{t(lang, '建立時間', 'Created At', 'Thời gian tạo')}：{ot.created_at}</p></div>
+                        <div><strong>#{ot.id}｜{ot.employee_no} {ot.employee_name}｜{statusText(ot.status, lang)}</strong>
+                          <p>{ot.overtime_type}｜{ot.overtime_date} {ot.start_time}~{ot.end_time}</p>
+                          <p>{t(lang, '時數', 'Hours', 'Số giờ')}：{ot.total_hours ?? '-'} {t(lang, '小時', 'hr(s)', 'giờ')}</p>
+                          <p>{t(lang, '原因', 'Reason', 'Lý do')}：{ot.reason || t(lang, '未填寫', 'N/A', 'Chưa điền')}</p>
+                          <p>{t(lang, '審核主管', 'Approver', 'Người duyệt')}：{ot.current_approver_name} / {ot.current_approver_no}</p>
+                          <p>{t(lang, '建立時間', 'Created At', 'Thời gian tạo')}：{ot.created_at}</p>
+                        </div>
                       </div>
                     ))}
                   </div></>}
