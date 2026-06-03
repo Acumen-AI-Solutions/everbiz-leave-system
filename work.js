@@ -42,6 +42,10 @@ async function getEmployee(db, employeeNo) {
       rank_type,
       direct_manager_no,
       direct_manager_name,
+      first_proxy_no,
+      first_proxy_name,
+      second_proxy_no,
+      second_proxy_name,
       is_active
     FROM employees
     WHERE employee_no = ? AND is_active = 1
@@ -73,30 +77,69 @@ async function isHr(env, hrNo) {
   return role === 'hr'
 }
 
-// ========== 代理人檢查 ==========
-async function canActAsApprover(db, loginNo, currentApproverNo) {
-  if (!loginNo || !currentApproverNo) return false
+// ========== 請假流程：取得下一個審核人 ==========
+// 順序：代理人（優先第一） → 直屬主管 → 董事長（僅當請假時數 > 24 小時） → null
+async function getNextLeaveApprover(env, db, employeeNo, currentStage, totalHours) {
+  const applicant = await getEmployee(db, employeeNo)
+  if (!applicant) return null
 
-  const normalizedLoginNo = String(loginNo).trim().toUpperCase()
-  const normalizedApproverNo = String(currentApproverNo).trim().toUpperCase()
+  const stages = ['hr', 'proxy', 'manager', 'chairman']
+  const currentIndex = stages.indexOf(currentStage)
+  if (currentIndex === -1) return null
 
-  // 本人就是審核者
-  if (normalizedLoginNo === normalizedApproverNo) return true
+  for (let i = currentIndex + 1; i < stages.length; i++) {
+    const stage = stages[i]
+    if (stage === 'proxy') {
+      let proxyNo = null
+      let proxyName = ''
+      if (applicant.first_proxy_no) {
+        proxyNo = applicant.first_proxy_no.trim().toUpperCase()
+        proxyName = applicant.first_proxy_name || await getEmployeeName(db, proxyNo)
+      } else if (applicant.second_proxy_no) {
+        proxyNo = applicant.second_proxy_no.trim().toUpperCase()
+        proxyName = applicant.second_proxy_name || await getEmployeeName(db, proxyNo)
+      }
+      if (proxyNo) {
+        return { no: proxyNo, name: proxyName, stage: 'proxy' }
+      }
+      continue
+    }
+    if (stage === 'manager') {
+      if (applicant.direct_manager_no) {
+        const managerNo = applicant.direct_manager_no.trim().toUpperCase()
+        const managerName = applicant.direct_manager_name || await getEmployeeName(db, managerNo)
+        return { no: managerNo, name: managerName, stage: 'manager' }
+      }
+      continue
+    }
+    if (stage === 'chairman') {
+      // 只有請假時數 > 24 小時（三天以上）才送董事長，否則流程結束
+      if (totalHours > 24) {
+        const chairmanNo = getChairmanNo(env)
+        if (chairmanNo) {
+          const chairmanName = await getEmployeeName(db, chairmanNo)
+          return { no: chairmanNo, name: chairmanName, stage: 'chairman' }
+        }
+      }
+      return null
+    }
+  }
+  return null
+}
 
-  // 查詢審核者的代理人設定
-  const approver = await db.prepare(`
-    SELECT employee_no, first_proxy_no, second_proxy_no
-    FROM employees
-    WHERE employee_no = ?
-      AND is_active = 1
-  `).bind(normalizedApproverNo).first()
-
-  if (!approver) return false
-
-  return (
-    String(approver.first_proxy_no || '').trim().toUpperCase() === normalizedLoginNo ||
-    String(approver.second_proxy_no || '').trim().toUpperCase() === normalizedLoginNo
-  )
+// ========== 補卡/加班流程：HR → 直屬主管 → 結束 ==========
+async function getNextPunchOvertimeApprover(db, employeeNo, currentStage) {
+  if (currentStage === 'hr') {
+    const applicant = await getEmployee(db, employeeNo)
+    if (applicant && applicant.direct_manager_no) {
+      const managerNo = applicant.direct_manager_no.trim().toUpperCase()
+      const managerName = applicant.direct_manager_name || await getEmployeeName(db, managerNo)
+      return { no: managerNo, name: managerName, stage: 'manager' }
+    } else {
+      return null
+    }
+  }
+  return null
 }
 
 // ========== 路由處理 ==========
@@ -105,7 +148,6 @@ async function handleRequest(request, env) {
   const path = url.pathname
   const method = request.method
 
-  // CORS 預檢
   if (method === 'OPTIONS') {
     return new Response(null, {
       headers: {
@@ -153,7 +195,7 @@ async function handleRequest(request, env) {
     })
   }
 
-  // ----- 員工列表（一般使用者，僅列出 active 員工，不顯示代理人）-----
+  // ----- 員工列表（一般使用者）-----
   if (method === 'GET' && path === '/api/employees') {
     const result = await env.DB.prepare(`
       SELECT
@@ -172,8 +214,7 @@ async function handleRequest(request, env) {
     return jsonResponse({ ok: true, employees: result.results || [] })
   }
 
-  // ========== HR 管理專用 API（限人資） ==========
-  // 1. 取得所有員工（含停用、含代理人欄位）
+  // ========== HR 管理專用 API ==========
   if (method === 'GET' && path === '/api/hr/employees') {
     const hrNo = url.searchParams.get('hr_no')
     if (!hrNo) return jsonResponse({ ok: false, message: '缺少 hr_no' }, 400)
@@ -203,7 +244,6 @@ async function handleRequest(request, env) {
     return jsonResponse({ ok: true, employees: result.results || [] })
   }
 
-  // 2. 新增或更新員工（支援第一、第二代理人）
   if (method === 'POST' && path === '/api/hr/employee/upsert') {
     const body = await request.json()
     const hrNo = body.hr_no
@@ -236,7 +276,6 @@ async function handleRequest(request, env) {
     `).bind(employeeNo).first()
 
     if (existing) {
-      // 更新
       await env.DB.prepare(`
         UPDATE employees
         SET
@@ -255,64 +294,33 @@ async function handleRequest(request, env) {
           updated_at = ?
         WHERE employee_no = ?
       `).bind(
-        employeeName,
-        departmentName,
-        positionTitle,
-        rankType,
-        directManagerNo,
-        directManagerName,
-        firstProxyNo,
-        firstProxyName,
-        secondProxyNo,
-        secondProxyName,
-        pinCode,
-        isActive,
-        now,
-        employeeNo
+        employeeName, departmentName, positionTitle, rankType,
+        directManagerNo, directManagerName,
+        firstProxyNo, firstProxyName,
+        secondProxyNo, secondProxyName,
+        pinCode, isActive, now, employeeNo
       ).run()
       return jsonResponse({ ok: true, message: '員工資料已更新', employee_no: employeeNo })
     } else {
-      // 新增
       await env.DB.prepare(`
         INSERT INTO employees (
-          employee_no,
-          employee_name,
-          department_name,
-          position_title,
-          rank_type,
-          direct_manager_no,
-          direct_manager_name,
-          first_proxy_no,
-          first_proxy_name,
-          second_proxy_no,
-          second_proxy_name,
-          pin_code,
-          is_active,
-          created_at,
-          updated_at
+          employee_no, employee_name, department_name, position_title, rank_type,
+          direct_manager_no, direct_manager_name,
+          first_proxy_no, first_proxy_name,
+          second_proxy_no, second_proxy_name,
+          pin_code, is_active, created_at, updated_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
-        employeeNo,
-        employeeName,
-        departmentName,
-        positionTitle,
-        rankType,
-        directManagerNo,
-        directManagerName,
-        firstProxyNo,
-        firstProxyName,
-        secondProxyNo,
-        secondProxyName,
-        pinCode,
-        isActive,
-        now,
-        now
+        employeeNo, employeeName, departmentName, positionTitle, rankType,
+        directManagerNo, directManagerName,
+        firstProxyNo, firstProxyName,
+        secondProxyNo, secondProxyName,
+        pinCode, isActive, now, now
       ).run()
       return jsonResponse({ ok: true, message: '員工已新增', employee_no: employeeNo })
     }
   }
 
-  // 3. 停用員工（軟刪除）
   if (method === 'POST' && path === '/api/hr/employee/deactivate') {
     const body = await request.json()
     const hrNo = body.hr_no
@@ -320,30 +328,23 @@ async function handleRequest(request, env) {
     if (!(await isHr(env, hrNo))) {
       return jsonResponse({ ok: false, message: '無權限，僅人資可操作' }, 403)
     }
-
     const employeeNo = String(body.employee_no || '').trim().toUpperCase()
     if (!employeeNo) return jsonResponse({ ok: false, message: '缺少 employee_no' }, 400)
 
     const existing = await env.DB.prepare(`
       SELECT is_active FROM employees WHERE employee_no = ?
     `).bind(employeeNo).first()
-    if (!existing) {
-      return jsonResponse({ ok: false, message: '查無此員工' }, 404)
-    }
-    if (existing.is_active === 0) {
-      return jsonResponse({ ok: false, message: '員工已是停用狀態' }, 400)
-    }
+    if (!existing) return jsonResponse({ ok: false, message: '查無此員工' }, 404)
+    if (existing.is_active === 0) return jsonResponse({ ok: false, message: '員工已是停用狀態' }, 400)
 
     const now = getTaiwanTimeString()
     await env.DB.prepare(`
-      UPDATE employees
-      SET is_active = 0, updated_at = ?
-      WHERE employee_no = ?
+      UPDATE employees SET is_active = 0, updated_at = ? WHERE employee_no = ?
     `).bind(now, employeeNo).run()
     return jsonResponse({ ok: true, message: '員工已停用', employee_no: employeeNo })
   }
 
-  // ----- 請假申請（三天以上送董事長）-----
+  // ========== 請假申請（第一關：人資） ==========
   if (method === 'POST' && path === '/api/leave/create') {
     const body = await request.json()
     const employeeNo = String(body.employee_no || '').trim().toUpperCase()
@@ -364,19 +365,9 @@ async function handleRequest(request, env) {
     const employee = await getEmployee(env.DB, employeeNo)
     if (!employee) return jsonResponse({ ok: false, message: '查無此員工或已離職' }, 404)
 
-    let approverNo = '', approverName = '', approvalStage = ''
-    if (totalHours >= 24) {
-      approverNo = getChairmanNo(env)
-      approverName = await getEmployeeName(env.DB, approverNo)
-      approvalStage = 'chairman'
-    } else {
-      approverNo = employee.direct_manager_no || ''
-      approverName = employee.direct_manager_name || ''
-      approvalStage = 'manager'
-    }
-    if (!approverNo) {
-      return jsonResponse({ ok: false, message: '無法找到審核主管，請聯絡人資' }, 400)
-    }
+    const hrNo = getHrNo(env)
+    const hrName = await getEmployeeName(env.DB, hrNo)
+    if (!hrNo) return jsonResponse({ ok: false, message: '系統尚未設定人資編號' }, 500)
 
     const now = getTaiwanTimeString()
     const insert = await env.DB.prepare(`
@@ -386,26 +377,25 @@ async function handleRequest(request, env) {
         total_hours, reason, status, approval_stage,
         current_approver_no, current_approver_name,
         created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'hr', ?, ?, ?, ?)
     `).bind(
       employee.employee_no, employee.employee_name, leaveType,
       startDate, startTime, endDate, endTime,
       totalHours, body.reason || '',
-      approvalStage, approverNo, approverName,
-      now, now
+      hrNo, hrName, now, now
     ).run()
+
     return jsonResponse({
       ok: true,
-      message: totalHours >= 24 ? '三天以上請假已送董事長審核' : '請假單已送出',
+      message: '請假單已送出，待人資審核',
       leave_request_id: insert.meta.last_row_id,
-      current_approver_no: approverNo,
-      current_approver_name: approverName,
-      total_hours: totalHours,
-      direct_to_chairman: totalHours >= 24
+      current_approver_no: hrNo,
+      current_approver_name: hrName,
+      total_hours: totalHours
     })
   }
 
-  // ----- 補卡申請（第一關：人資）-----
+  // ----- 補卡申請 -----
   if (method === 'POST' && path === '/api/punch/create') {
     const body = await request.json()
     const employeeNo = String(body.employee_no || '').trim().toUpperCase()
@@ -445,7 +435,7 @@ async function handleRequest(request, env) {
     })
   }
 
-  // ----- 加班申請（第一關：人資）-----
+  // ----- 加班申請 -----
   if (method === 'POST' && path === '/api/overtime/create') {
     const body = await request.json()
     const employeeNo = String(body.employee_no || '').trim().toUpperCase()
@@ -495,89 +485,51 @@ async function handleRequest(request, env) {
   if (method === 'GET' && path === '/api/leave/my') {
     const employeeNo = url.searchParams.get('employee_no')
     if (!employeeNo) return jsonResponse({ ok: false, message: '缺少 employee_no' }, 400)
-    const stmt = await env.DB.prepare(`
-      SELECT * FROM leave_requests
-      WHERE employee_no = ?
-      ORDER BY created_at DESC
-    `).bind(employeeNo.trim().toUpperCase())
-    const result = await stmt.all()
+    const result = await env.DB.prepare(`
+      SELECT * FROM leave_requests WHERE employee_no = ? ORDER BY created_at DESC
+    `).bind(employeeNo.trim().toUpperCase()).all()
     return jsonResponse({ ok: true, leaves: result.results })
   }
 
-  // ----- 我的補卡紀錄 -----
   if (method === 'GET' && path === '/api/punch/my') {
     const employeeNo = url.searchParams.get('employee_no')
     if (!employeeNo) return jsonResponse({ ok: false, message: '缺少 employee_no' }, 400)
     const result = await env.DB.prepare(`
-      SELECT * FROM punch_requests
-      WHERE employee_no = ?
-      ORDER BY created_at DESC
+      SELECT * FROM punch_requests WHERE employee_no = ? ORDER BY created_at DESC
     `).bind(employeeNo.trim().toUpperCase()).all()
     return jsonResponse({ ok: true, punches: result.results || [] })
   }
 
-  // ----- 我的加班紀錄 -----
   if (method === 'GET' && path === '/api/overtime/my') {
     const employeeNo = url.searchParams.get('employee_no')
     if (!employeeNo) return jsonResponse({ ok: false, message: '缺少 employee_no' }, 400)
     const result = await env.DB.prepare(`
-      SELECT * FROM overtime_requests
-      WHERE employee_no = ?
-      ORDER BY created_at DESC
+      SELECT * FROM overtime_requests WHERE employee_no = ? ORDER BY created_at DESC
     `).bind(employeeNo.trim().toUpperCase()).all()
     return jsonResponse({ ok: true, overtimes: result.results || [] })
   }
 
-  // ----- 待審核列表（支援代理人，使用子查詢）-----
+  // ----- 待審核列表：只列出目前指定審核人的單 -----
   if (method === 'GET' && path === '/api/leave/pending') {
     const approverNo = url.searchParams.get('approver_no')
     if (!approverNo) return jsonResponse({ ok: false, message: '缺少 approver_no' }, 400)
     const normalized = approverNo.trim().toUpperCase()
 
-    // 請假單：本人或代理對象
-    const leavesStmt = await env.DB.prepare(`
+    const leaves = await env.DB.prepare(`
       SELECT * FROM leave_requests
-      WHERE status = 'pending'
-        AND (
-          current_approver_no = ?
-          OR current_approver_no IN (
-            SELECT employee_no FROM employees
-            WHERE first_proxy_no = ? OR second_proxy_no = ?
-          )
-        )
+      WHERE status = 'pending' AND current_approver_no = ?
       ORDER BY created_at DESC
-    `).bind(normalized, normalized, normalized)
-    const leaves = await leavesStmt.all()
-
-    // 補卡單
-    const punchesStmt = await env.DB.prepare(`
+    `).bind(normalized).all()
+    const punches = await env.DB.prepare(`
       SELECT * FROM punch_requests
-      WHERE status = 'pending'
-        AND (
-          current_approver_no = ?
-          OR current_approver_no IN (
-            SELECT employee_no FROM employees
-            WHERE first_proxy_no = ? OR second_proxy_no = ?
-          )
-        )
+      WHERE status = 'pending' AND current_approver_no = ?
       ORDER BY created_at DESC
-    `).bind(normalized, normalized, normalized)
-    const punches = await punchesStmt.all()
-
-    // 加班單
-    const overtimesStmt = await env.DB.prepare(`
+    `).bind(normalized).all()
+    const overtimes = await env.DB.prepare(`
       SELECT * FROM overtime_requests
-      WHERE status = 'pending'
-        AND (
-          current_approver_no = ?
-          OR current_approver_no IN (
-            SELECT employee_no FROM employees
-            WHERE first_proxy_no = ? OR second_proxy_no = ?
-          )
-        )
+      WHERE status = 'pending' AND current_approver_no = ?
       ORDER BY created_at DESC
-    `).bind(normalized, normalized, normalized)
-    const overtimes = await overtimesStmt.all()
+    `).bind(normalized).all()
 
     return jsonResponse({
       ok: true,
@@ -587,7 +539,7 @@ async function handleRequest(request, env) {
     })
   }
 
-  // ----- 請假審核（支援代理人）-----
+  // ========== 請假審核 ==========
   if (method === 'POST' && path === '/api/leave/approve') {
     const body = await request.json()
     const leaveId = Number(body.leave_id || 0)
@@ -596,24 +548,38 @@ async function handleRequest(request, env) {
     if (!leaveId || !approverNo || !action) return jsonResponse({ ok: false, message: '缺少必要欄位' }, 400)
     if (!['approved', 'rejected'].includes(action)) return jsonResponse({ ok: false, message: 'action 只能為 approved 或 rejected' }, 400)
 
-    // 查詢假單，確保狀態為 pending
     const leave = await env.DB.prepare(`
       SELECT * FROM leave_requests
-      WHERE id = ? AND status = 'pending'
-    `).bind(leaveId).first()
-    if (!leave) return jsonResponse({ ok: false, message: '無待審核假單' }, 404)
+      WHERE id = ? AND status = 'pending' AND current_approver_no = ?
+    `).bind(leaveId, approverNo).first()
+    if (!leave) return jsonResponse({ ok: false, message: '無待審核假單或無權限' }, 404)
 
-    // 檢查權限：登入者是否為 current_approver_no 的本人或代理人
-    const hasRight = await canActAsApprover(env.DB, approverNo, leave.current_approver_no)
-    if (!hasRight) return jsonResponse({ ok: false, message: '無權限審核此假單' }, 403)
-
-    const newStatus = action === 'approved' ? 'approved' : 'rejected'
     const now = getTaiwanTimeString()
-    await env.DB.prepare(`UPDATE leave_requests SET status = ?, updated_at = ? WHERE id = ?`).bind(newStatus, now, leaveId).run()
-    return jsonResponse({ ok: true, message: action === 'approved' ? '已核准' : '已駁回' })
+    if (action === 'rejected') {
+      await env.DB.prepare(`UPDATE leave_requests SET status = 'rejected', updated_at = ? WHERE id = ?`).bind(now, leaveId).run()
+      return jsonResponse({ ok: true, message: '假單已駁回' })
+    }
+
+    const nextApprover = await getNextLeaveApprover(env, env.DB, leave.employee_no, leave.approval_stage, leave.total_hours)
+    if (!nextApprover) {
+      await env.DB.prepare(`UPDATE leave_requests SET status = 'approved', updated_at = ? WHERE id = ?`).bind(now, leaveId).run()
+      return jsonResponse({ ok: true, message: '假單已核准' })
+    } else {
+      await env.DB.prepare(`
+        UPDATE leave_requests
+        SET approval_stage = ?, current_approver_no = ?, current_approver_name = ?, updated_at = ?
+        WHERE id = ?
+      `).bind(nextApprover.stage, nextApprover.no, nextApprover.name, now, leaveId).run()
+      return jsonResponse({
+        ok: true,
+        message: `已核准，轉送 ${nextApprover.name} / ${nextApprover.no} 審核`,
+        next_approver_no: nextApprover.no,
+        next_approver_name: nextApprover.name
+      })
+    }
   }
 
-  // ----- 補卡審核（二階段，支援代理人）-----
+  // ========== 補卡審核 ==========
   if (method === 'POST' && path === '/api/punch/action') {
     const body = await request.json()
     const punchId = Number(body.punch_request_id || 0)
@@ -622,18 +588,13 @@ async function handleRequest(request, env) {
     if (!punchId || !approverNo || !action) return jsonResponse({ ok: false, message: '缺少必要欄位' }, 400)
     if (!['approved', 'rejected'].includes(action)) return jsonResponse({ ok: false, message: 'action 只能為 approved 或 rejected' }, 400)
 
-    // 查詢補卡單，帶入申請人的直屬主管資訊（用於轉交）
     const punch = await env.DB.prepare(`
       SELECT p.*, e.direct_manager_no, e.direct_manager_name
       FROM punch_requests p
       JOIN employees e ON p.employee_no = e.employee_no
-      WHERE p.id = ? AND p.status = 'pending'
-    `).bind(punchId).first()
-    if (!punch) return jsonResponse({ ok: false, message: '無待審核補卡單' }, 404)
-
-    // 檢查權限
-    const hasRight = await canActAsApprover(env.DB, approverNo, punch.current_approver_no)
-    if (!hasRight) return jsonResponse({ ok: false, message: '無權限審核此補卡單' }, 403)
+      WHERE p.id = ? AND p.status = 'pending' AND p.current_approver_no = ?
+    `).bind(punchId, approverNo).first()
+    if (!punch) return jsonResponse({ ok: false, message: '無待審核補卡單或無權限' }, 404)
 
     const now = getTaiwanTimeString()
     if (action === 'rejected') {
@@ -641,22 +602,19 @@ async function handleRequest(request, env) {
       return jsonResponse({ ok: true, message: '補卡已駁回' })
     }
 
-    // 核准流程
     if (punch.approval_stage === 'hr') {
-      const managerNo = punch.direct_manager_no
-      if (!managerNo) {
-        await env.DB.prepare(`UPDATE punch_requests SET status = 'approved', approval_stage = 'manager', current_approver_no = NULL, updated_at = ? WHERE id = ?`).bind(now, punchId).run()
+      const next = await getNextPunchOvertimeApprover(env.DB, punch.employee_no, 'hr')
+      if (!next) {
+        await env.DB.prepare(`UPDATE punch_requests SET status = 'approved', updated_at = ? WHERE id = ?`).bind(now, punchId).run()
         return jsonResponse({ ok: true, message: '補卡已核准（無直屬主管）' })
+      } else {
+        await env.DB.prepare(`
+          UPDATE punch_requests
+          SET approval_stage = ?, current_approver_no = ?, current_approver_name = ?, updated_at = ?
+          WHERE id = ?
+        `).bind(next.stage, next.no, next.name, now, punchId).run()
+        return jsonResponse({ ok: true, message: `人資已核准，轉送主管 ${next.name} / ${next.no} 審核` })
       }
-      const managerName = punch.direct_manager_name || await getEmployeeName(env.DB, managerNo)
-      await env.DB.prepare(`
-        UPDATE punch_requests
-        SET approval_stage = 'manager',
-            current_approver_no = ?, current_approver_name = ?,
-            updated_at = ?
-        WHERE id = ?
-      `).bind(managerNo, managerName, now, punchId).run()
-      return jsonResponse({ ok: true, message: `人資已核准，轉送主管 ${managerName} 審核` })
     }
     if (punch.approval_stage === 'manager') {
       await env.DB.prepare(`UPDATE punch_requests SET status = 'approved', updated_at = ? WHERE id = ?`).bind(now, punchId).run()
@@ -665,7 +623,7 @@ async function handleRequest(request, env) {
     return jsonResponse({ ok: false, message: '未知的審核階段' }, 400)
   }
 
-  // ----- 加班審核（二階段，支援代理人）-----
+  // ========== 加班審核 ==========
   if (method === 'POST' && path === '/api/overtime/action') {
     const body = await request.json()
     const overtimeId = Number(body.overtime_request_id || 0)
@@ -678,33 +636,29 @@ async function handleRequest(request, env) {
       SELECT o.*, e.direct_manager_no, e.direct_manager_name
       FROM overtime_requests o
       JOIN employees e ON o.employee_no = e.employee_no
-      WHERE o.id = ? AND o.status = 'pending'
-    `).bind(overtimeId).first()
-    if (!overtime) return jsonResponse({ ok: false, message: '無待審核加班單' }, 404)
-
-    const hasRight = await canActAsApprover(env.DB, approverNo, overtime.current_approver_no)
-    if (!hasRight) return jsonResponse({ ok: false, message: '無權限審核此加班單' }, 403)
+      WHERE o.id = ? AND o.status = 'pending' AND o.current_approver_no = ?
+    `).bind(overtimeId, approverNo).first()
+    if (!overtime) return jsonResponse({ ok: false, message: '無待審核加班單或無權限' }, 404)
 
     const now = getTaiwanTimeString()
     if (action === 'rejected') {
       await env.DB.prepare(`UPDATE overtime_requests SET status = 'rejected', updated_at = ? WHERE id = ?`).bind(now, overtimeId).run()
       return jsonResponse({ ok: true, message: '加班已駁回' })
     }
+
     if (overtime.approval_stage === 'hr') {
-      const managerNo = overtime.direct_manager_no
-      if (!managerNo) {
-        await env.DB.prepare(`UPDATE overtime_requests SET status = 'approved', approval_stage = 'manager', current_approver_no = NULL, updated_at = ? WHERE id = ?`).bind(now, overtimeId).run()
+      const next = await getNextPunchOvertimeApprover(env.DB, overtime.employee_no, 'hr')
+      if (!next) {
+        await env.DB.prepare(`UPDATE overtime_requests SET status = 'approved', updated_at = ? WHERE id = ?`).bind(now, overtimeId).run()
         return jsonResponse({ ok: true, message: '加班已核准（無直屬主管）' })
+      } else {
+        await env.DB.prepare(`
+          UPDATE overtime_requests
+          SET approval_stage = ?, current_approver_no = ?, current_approver_name = ?, updated_at = ?
+          WHERE id = ?
+        `).bind(next.stage, next.no, next.name, now, overtimeId).run()
+        return jsonResponse({ ok: true, message: `人資已核准，轉送主管 ${next.name} / ${next.no} 審核` })
       }
-      const managerName = overtime.direct_manager_name || await getEmployeeName(env.DB, managerNo)
-      await env.DB.prepare(`
-        UPDATE overtime_requests
-        SET approval_stage = 'manager',
-            current_approver_no = ?, current_approver_name = ?,
-            updated_at = ?
-        WHERE id = ?
-      `).bind(managerNo, managerName, now, overtimeId).run()
-      return jsonResponse({ ok: true, message: `人資已核准，轉送主管 ${managerName} 審核` })
     }
     if (overtime.approval_stage === 'manager') {
       await env.DB.prepare(`UPDATE overtime_requests SET status = 'approved', updated_at = ? WHERE id = ?`).bind(now, overtimeId).run()
@@ -713,7 +667,7 @@ async function handleRequest(request, env) {
     return jsonResponse({ ok: false, message: '未知的審核階段' }, 400)
   }
 
-  // ----- 取消假單（申請人取消自己的待審核假單）-----
+  // ----- 取消假單 -----
   if (method === 'POST' && path === '/api/leave/cancel') {
     const body = await request.json()
     const leaveId = Number(body.leave_id || 0)
@@ -782,7 +736,7 @@ async function handleRequest(request, env) {
     })
   }
 
-  // ----- 除錯路由（測試資料庫連線）-----
+  // ----- 除錯路由 -----
   if (method === 'GET' && path === '/api/debug/db') {
     try {
       const countStmt = await env.DB.prepare('SELECT COUNT(*) as count FROM employees').first()
@@ -798,7 +752,6 @@ async function handleRequest(request, env) {
     }
   }
 
-  // 根路徑
   if (method === 'GET' && path === '/') {
     return new Response('Everbiz HR System API Running', { status: 200 })
   }
