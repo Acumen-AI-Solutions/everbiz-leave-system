@@ -253,6 +253,7 @@ tr:last-child td {
     width: 200px;
   }
 }
+
 .alert {
   background: #fef2f2;
   color: #991b1b;
@@ -314,6 +315,7 @@ tr:last-child td {
     grid-template-columns: 1fr;
   }
 }
+
 .approval-search {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -417,6 +419,7 @@ button:disabled {
     width: 100%;
   }
 }
+
 .login-card {
   max-width: 520px;
   margin: 0 auto 24px;
@@ -439,7 +442,8 @@ input[readonly] {
   background: #f8fafc;
   color: #475569;
 }
-/* Add this to the bottom of src/react-app/App.css */
+
+/* 表單分頁按鈕 */
 .form-tabs {
   display: flex;
   flex-wrap: wrap;
@@ -477,6 +481,8 @@ input[readonly] {
     width: 100%;
   }
 }
+
+/* 員工管理專用樣式 */
 .employee-active-row {
   margin-top: 12px;
   display: flex;
@@ -492,6 +498,11 @@ input[readonly] {
   color: #0f2f3f;
 }
 
+.employee-active-row input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+}
+
 .employee-form-actions {
   margin-top: 18px;
   display: flex;
@@ -502,4 +513,10 @@ input[readonly] {
 
 .employee-form-actions button {
   min-width: 72px;
+}
+
+.employee-form-actions .approve-btn,
+.employee-form-actions .reject-btn {
+  width: auto;
+  margin-bottom: 0;
 }
