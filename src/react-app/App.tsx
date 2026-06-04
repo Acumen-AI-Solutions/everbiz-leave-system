@@ -543,7 +543,7 @@ function App() {
     }
   }
 
-  // ----- 登入（僅設定使用者，清空狀態）-----
+  // ----- 登入 -----
   async function handleLogin(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const normalizedEmployeeNo = loginEmployeeNo.trim().toUpperCase()
@@ -741,7 +741,7 @@ function App() {
         `Đơn bổ sung chấm công đã gửi. Chờ duyệt từ ${approverLabel(data.current_approver_no, data.current_approver_name)}.`
       ))
       setPunchReason('')
-      await loadMyPunches()
+      await loadMyPunchesSilent()
     } catch {
       setPunchMessage(t(lang, '補卡申請送出失敗，請確認 /api/punch/create 是否正常', 'Submission failed. Please check /api/punch/create.', 'Gửi thất bại. Vui lòng kiểm tra /api/punch/create.'))
     }
@@ -780,7 +780,7 @@ function App() {
         `Đơn tăng ca đã gửi. Chờ duyệt từ ${approverLabel(data.current_approver_no, data.current_approver_name)}.`
       ))
       setOvertimeReason('')
-      await loadMyOvertimes()
+      await loadMyOvertimesSilent()
     } catch {
       setOvertimeMessage(t(lang, '加班申請送出失敗，請確認 /api/overtime/create 是否正常', 'Submission failed. Please check /api/overtime/create.', 'Gửi thất bại. Vui lòng kiểm tra /api/overtime/create.'))
     }
@@ -879,7 +879,7 @@ function App() {
       }
       setApprovalMessage(data.message || t(lang, `補卡${actionText}完成`, `Punch correction ${actionText.toLowerCase()} complete`, `Hoàn tất ${actionText} chấm công`))
       await loadPendingApprovals()
-      await loadMyPunches()
+      await loadMyPunchesSilent()
     } catch {
       setApprovalMessage(t(lang, '補卡審核失敗，請確認 /api/punch/action 是否正常', 'Punch approval failed. Please check /api/punch/action.', 'Phê duyệt thất bại. Vui lòng kiểm tra /api/punch/action.'))
     }
@@ -912,13 +912,13 @@ function App() {
       }
       setApprovalMessage(data.message || t(lang, `加班${actionText}完成`, `Overtime ${actionText.toLowerCase()} complete`, `Hoàn tất ${actionText} tăng ca`))
       await loadPendingApprovals()
-      await loadMyOvertimes()
+      await loadMyOvertimesSilent()
     } catch {
       setApprovalMessage(t(lang, '加班審核失敗，請確認 /api/overtime/action 是否正常', 'Overtime approval failed. Please check /api/overtime/action.', 'Phê duyệt thất bại. Vui lòng kiểm tra /api/overtime/action.'))
     }
   }
 
-  // ----- 我的假單、補卡、加班 -----
+  // ----- 我的假單、補卡、加班 (Silent) -----
   async function loadMyLeavesSilent() {
     if (!currentUser) return
     try {
@@ -928,6 +928,25 @@ function App() {
     } catch { /* silent */ }
   }
 
+  async function loadMyPunchesSilent() {
+    if (!currentUser) return
+    try {
+      const res = await fetch(`${API_BASE}/api/punch/my?employee_no=${encodeURIComponent(currentUser.employee_no)}`)
+      const data = await res.json()
+      if (data.ok) setMyPunches(sortByStatus(data.punches || []))
+    } catch { /* silent */ }
+  }
+
+  async function loadMyOvertimesSilent() {
+    if (!currentUser) return
+    try {
+      const res = await fetch(`${API_BASE}/api/overtime/my?employee_no=${encodeURIComponent(currentUser.employee_no)}`)
+      const data = await res.json()
+      if (data.ok) setMyOvertimes(sortByStatus(data.overtimes || []))
+    } catch { /* silent */ }
+  }
+
+  // ----- 我的假單、補卡、加班 (With loading state) -----
   async function loadMyLeaves() {
     if (!currentUser) return
     setIsLoadingMyLeaves(true)
@@ -1202,8 +1221,8 @@ function App() {
 
     loadEmployees()
     loadMyLeavesSilent()
-    loadMyPunches()
-    loadMyOvertimes()
+    loadMyPunchesSilent()
+    loadMyOvertimesSilent()
 
     if (
       currentUser.system_role === 'hr' ||
@@ -1214,7 +1233,6 @@ function App() {
   }, [currentUser])
 
   // ==================== Helper: 顯示審核主管 ====================
-  // 用於 JSX 與 template string 兩種場合
   function approverLabel(approverNo: string, approverName: string): string {
     return approverNo === 'PROXY'
       ? t(lang, '第一或第二代理人', '1st or 2nd Proxy', 'Người duyệt thay 1 hoặc 2')
@@ -1225,7 +1243,7 @@ function App() {
     return approverLabel(approverNo, approverName)
   }
 
-  // ==================== 渲染（無二次排序） ====================
+  // ==================== 渲染 ====================
   return (
     <div className="page">
       <nav className="top-nav">
@@ -1345,11 +1363,11 @@ function App() {
                     </div>
                     <div className="note-box">
                       {t(
-  lang,
-  '填寫說明：上方「此員工的審核主管」代表此員工送出請假、補卡、加班時，由誰審核。下方「第一代理人 / 第二代理人」代表當此員工本身是主管時，誰可以代理此員工去核准別人的申請。例如要讓 E001 代理陳主任審核，請編輯陳主任那筆資料，並把第一代理人填 E001。',
-  `Input note: "This employee's approver" means who approves this employee's leave, punch, or overtime requests. "1st / 2nd proxy" means who can approve on behalf of this employee when this employee is an approver. For example, to let E001 approve on behalf of Manager Chen, edit Manager Chen's employee record and set E001 as the 1st proxy.`,
-  `Ghi chú: "Người duyệt của nhân viên này" là người duyệt đơn nghỉ, chấm công hoặc tăng ca của nhân viên này. "Người duyệt thay 1 / 2" là người có thể duyệt thay khi nhân viên này là người duyệt. Ví dụ muốn E001 duyệt thay quản lý Chen, hãy chỉnh hồ sơ của quản lý Chen và đặt E001 là người duyệt thay 1.`
-)}
+                        lang,
+                        '填寫說明：上方「此員工的審核主管」代表此員工送出請假、補卡、加班時，由誰審核。下方「第一代理人 / 第二代理人」代表當此員工本身是主管時，誰可以代理此員工去核准別人的申請。例如要讓 E001 代理陳主任審核，請編輯陳主任那筆資料，並把第一代理人填 E001。',
+                        `Input note: "This employee's approver" means who approves this employee's leave, punch, or overtime requests. "1st / 2nd proxy" means who can approve on behalf of this employee when this employee is an approver. For example, to let E001 approve on behalf of Manager Chen, edit Manager Chen's employee record and set E001 as the 1st proxy.`,
+                        `Ghi chú: "Người duyệt của nhân viên này" là người duyệt đơn nghỉ, chấm công hoặc tăng ca của nhân viên này. "Người duyệt thay 1 / 2" là người có thể duyệt thay khi nhân viên này là người duyệt. Ví dụ muốn E001 duyệt thay quản lý Chen, hãy chỉnh hồ sơ của quản lý Chen và đặt E001 là người duyệt thay 1.`
+                      )}
                     </div>
                     <div className="two">
                       <input type="text" placeholder={t(lang, '可代理此員工審核的第一代理人工號', '1st proxy approver no. for this employee', 'Mã người duyệt thay 1')} value={employeeFormData.first_proxy_no} onChange={e => setEmployeeFormData({ ...employeeFormData, first_proxy_no: e.target.value })} />
@@ -1549,7 +1567,6 @@ function App() {
                 </section>
               )}
 
-              {/* 我的紀錄（分頁） */}
               <section className="card result-card">
                 <h2>{t(lang, '我的紀錄', 'My Records', 'Hồ sơ của tôi')}</h2>
                 <div className="form-tabs">
