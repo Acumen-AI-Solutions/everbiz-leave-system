@@ -162,6 +162,40 @@ function isWeekend(date: Date): boolean {
   return day === 0 || day === 6
 }
 
+// 國定假日 (2026, 2027)
+const holidays = [
+  // 2026
+  '2026-01-01',
+  '2026-02-16',
+  '2026-02-17',
+  '2026-02-18',
+  '2026-02-19',
+  '2026-02-20',
+  '2026-02-27',
+  '2026-04-03',
+  '2026-04-06',
+  '2026-06-19',
+  '2026-09-25',
+  '2026-10-09',
+  // 2027
+  '2027-01-01',
+  '2027-02-04',
+  '2027-02-05',
+  '2027-02-06',
+  '2027-02-08',
+  '2027-02-09',
+  '2027-03-01',
+  '2027-04-05',
+  '2027-04-06',
+  '2027-06-09',
+  '2027-09-15',
+  '2027-10-11',
+]
+
+function isHoliday(date: Date): boolean {
+  return holidays.includes(formatDate(date))
+}
+
 function calculateLeaveHours(
   startDate: string,
   startTime: string,
@@ -179,7 +213,7 @@ function calculateLeaveHours(
   let totalMinutes = 0
   const current = new Date(start)
   while (current <= end) {
-    if (!isWeekend(current)) {
+    if (!isWeekend(current) && !isHoliday(current)) {
       const currentDate = formatDate(current)
       let dayStart = workStart
       let dayEnd = workEnd
@@ -249,6 +283,24 @@ function sortByStatus<T extends { status: string; updated_at?: string; created_a
   })
 }
 // ==================================================
+
+// 假別選項
+const leaveTypes = [
+  '特休',
+  '事假',
+  '病假',
+  '生理假',
+  '家庭照顧假',
+  '婚假',
+  '喪假',
+  '公假',
+  '公傷病假',
+  '產假',
+  '陪產檢及陪產假',
+  '育嬰留職停薪',
+  '補休',
+  '無薪假',
+]
 
 function App() {
   const [loginEmployeeNo, setLoginEmployeeNo] = useState('')
@@ -1286,10 +1338,10 @@ function App() {
                     </div>
                     <div className="two">
                       <input type="text" placeholder={t(lang, '職等 / 角色', 'Rank / Role', 'Cấp bậc / Vai trò')} value={employeeFormData.rank_type} onChange={e => setEmployeeFormData({ ...employeeFormData, rank_type: e.target.value })} />
-                      <input type="text" placeholder={t(lang, '此員工的審核主管工號', 'This employee's approver no.', 'Mã người duyệt của nhân viên này')} value={employeeFormData.direct_manager_no} onChange={e => setEmployeeFormData({ ...employeeFormData, direct_manager_no: e.target.value })} />
+                      <input type="text" placeholder={t(lang, '此員工的審核主管工號', "This employee's approver no.", 'Mã người duyệt của nhân viên này')} value={employeeFormData.direct_manager_no} onChange={e => setEmployeeFormData({ ...employeeFormData, direct_manager_no: e.target.value })} />
                     </div>
                     <div className="two">
-                      <input type="text" placeholder={t(lang, '此員工的審核主管姓名', 'This employee's approver name', 'Tên người duyệt của nhân viên này')} value={employeeFormData.direct_manager_name} onChange={e => setEmployeeFormData({ ...employeeFormData, direct_manager_name: e.target.value })} />
+                      <input type="text" placeholder={t(lang, '此員工的審核主管姓名', "This employee's approver name", 'Tên người duyệt của nhân viên này')} value={employeeFormData.direct_manager_name} onChange={e => setEmployeeFormData({ ...employeeFormData, direct_manager_name: e.target.value })} />
                     </div>
                     <div className="note-box">
                       {t(
@@ -1385,11 +1437,9 @@ function App() {
                         <input value={employeeNo} readOnly placeholder={t(lang, '員工編號', 'Employee No.', 'Mã nhân viên')} />
                         <input value={employeeName} readOnly placeholder={t(lang, '姓名', 'Name', 'Tên')} />
                         <select value={leaveType} onChange={e => setLeaveType(e.target.value)}>
-                          <option>{t(lang, '特休', 'Annual Leave', 'Nghỉ phép năm')}</option>
-                          <option>{t(lang, '事假', 'Personal Leave', 'Nghỉ việc riêng')}</option>
-                          <option>{t(lang, '病假', 'Sick Leave', 'Nghỉ ốm')}</option>
-                          <option>{t(lang, '公假', 'Official Leave', 'Nghỉ công vụ')}</option>
-                          <option>{t(lang, '補休', 'Compensatory Leave', 'Nghỉ bù')}</option>
+                          {leaveTypes.map(type => (
+                            <option key={type} value={type}>{type}</option>
+                          ))}
                         </select>
                         <div className="two">
                           <input type="date" value={startDate} onChange={e => { setStartDate(e.target.value); setTotalHours(calculateLeaveHours(e.target.value, startTime, endDate, endTime)) }} />
