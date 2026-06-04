@@ -1345,11 +1345,11 @@ function App() {
                     </div>
                     <div className="note-box">
                       {t(
-                        lang,
-                        '填寫說明：上方「此員工的審核主管」代表此員工送出請假、補卡、加班時，由誰審核。下方「第一代理人 / 第二代理人」代表當此員工本身是主管時，誰可以代理此員工去核准別人的申請。例如要讓 E001 代理陳主任審核，請編輯陳主任那筆資料，並把第一代理人填 E001。',
-                        'Input note: "This employee's approver" means who approves this employee's leave, punch, or overtime requests. "1st / 2nd proxy" means who can approve on behalf of this employee when this employee is an approver. For example, to let E001 approve on behalf of Manager Chen, edit Manager Chen's employee record and set E001 as the 1st proxy.',
-                        'Ghi chú: "Người duyệt của nhân viên này" là người duyệt đơn nghỉ, chấm công hoặc tăng ca của nhân viên này. "Người duyệt thay 1 / 2" là người có thể duyệt thay khi nhân viên này là người duyệt. Ví dụ muốn E001 duyệt thay quản lý Chen, hãy chỉnh hồ sơ của quản lý Chen và đặt E001 là người duyệt thay 1.'
-                      )}
+  lang,
+  '填寫說明：上方「此員工的審核主管」代表此員工送出請假、補卡、加班時，由誰審核。下方「第一代理人 / 第二代理人」代表當此員工本身是主管時，誰可以代理此員工去核准別人的申請。例如要讓 E001 代理陳主任審核，請編輯陳主任那筆資料，並把第一代理人填 E001。',
+  `Input note: "This employee's approver" means who approves this employee's leave, punch, or overtime requests. "1st / 2nd proxy" means who can approve on behalf of this employee when this employee is an approver. For example, to let E001 approve on behalf of Manager Chen, edit Manager Chen's employee record and set E001 as the 1st proxy.`,
+  `Ghi chú: "Người duyệt của nhân viên này" là người duyệt đơn nghỉ, chấm công hoặc tăng ca của nhân viên này. "Người duyệt thay 1 / 2" là người có thể duyệt thay khi nhân viên này là người duyệt. Ví dụ muốn E001 duyệt thay quản lý Chen, hãy chỉnh hồ sơ của quản lý Chen và đặt E001 là người duyệt thay 1.`
+)}
                     </div>
                     <div className="two">
                       <input type="text" placeholder={t(lang, '可代理此員工審核的第一代理人工號', '1st proxy approver no. for this employee', 'Mã người duyệt thay 1')} value={employeeFormData.first_proxy_no} onChange={e => setEmployeeFormData({ ...employeeFormData, first_proxy_no: e.target.value })} />
