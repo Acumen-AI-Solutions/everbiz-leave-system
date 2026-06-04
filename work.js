@@ -205,6 +205,26 @@ async function handleRequest(request, env) {
     return jsonResponse({ ok: true, employees: result.results || [] })
   }
 
+  // ----- 假別列表（三語假別主檔）-----
+  if (method === 'GET' && path === '/api/leave/types') {
+    const result = await env.DB.prepare(`
+      SELECT
+        code,
+        name_zh,
+        name_en,
+        name_vi,
+        sort_order
+      FROM leave_types
+      WHERE is_active = 1
+      ORDER BY sort_order ASC
+    `).all()
+
+    return jsonResponse({
+      ok: true,
+      leave_types: result.results || []
+    })
+  }
+
   // ========== HR 管理專用 API ==========
   if (method === 'GET' && path === '/api/hr/employees') {
     const hrNo = url.searchParams.get('hr_no')
