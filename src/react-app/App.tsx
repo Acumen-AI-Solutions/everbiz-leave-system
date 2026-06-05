@@ -279,6 +279,28 @@ function normalizeExcelDate(value: unknown): string {
   return `${y}-${m}-${day}`
 }
 
+// ===== 新增 Excel 欄位查找輔助函數 =====
+function normalizeHeader(value: unknown): string {
+  return String(value ?? '')
+    .replace(/\s/g, '')
+    .replace(/\n/g, '')
+    .replace(/\r/g, '')
+    .trim()
+}
+
+function findColumnIndex(headers: unknown[], keywords: string[]): number {
+  return headers.findIndex(header => {
+    const text = normalizeHeader(header)
+    return keywords.every(keyword => text.includes(keyword))
+  })
+}
+
+function getExcelCell(row: unknown[], index: number): unknown {
+  if (index < 0) return ''
+  return row[index] ?? ''
+}
+// =================================================
+
 function statusText(status: string, lang: Lang) {
   if (status === 'pending') return t(lang, '待審核', 'Pending', 'Chờ duyệt')
   if (status === 'approved') return t(lang, '已核准', 'Approved', 'Đã duyệt')
@@ -808,7 +830,7 @@ function App() {
     }
   }
 
-  // ===== Excel 批次匯入加班 =====
+  // ===== Excel 批次匯入加班（新版：動態標題查找） =====
   function handleOvertimeExcelUpload(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     if (!file) return
@@ -822,38 +844,82 @@ function App() {
         const sheetName = workbook.SheetNames[0]
         const worksheet = workbook.Sheets[sheetName]
 
-        const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, {
+        const rawRows = XLSX.utils.sheet_to_json<unknown[]>(worksheet, {
+          header: 1,
           defval: '',
         })
 
-        const parsedRows: OvertimeImportRow[] = rows
-          .filter(row => String(row['員工編號'] || '').trim() !== '')
+        const headerRowIndex = rawRows.findIndex(row =>
+          row.some(cell => normalizeHeader(cell).includes('員工編號')) &&
+          row.some(cell => normalizeHeader(cell).includes('起始日期'))
+        )
+
+        if (headerRowIndex < 0) {
+          setOvertimeImportRows([])
+          setOvertimeImportMessage('找不到 Excel 標題列，請確認表格包含「員工編號、起始日期、起始時間、結束時間」')
+          return
+        }
+
+        const headers = rawRows[headerRowIndex]
+
+        const idxEmployeeNo = findColumnIndex(headers, ['員工編號'])
+        const idxEmployeeName = findColumnIndex(headers, ['員工姓名'])
+        const idxDepartmentName = findColumnIndex(headers, ['部門名稱'])
+        const idxOvertimeDate = findColumnIndex(headers, ['起始日期'])
+        const idxStartTime = findColumnIndex(headers, ['起始時間'])
+        const idxEndTime = findColumnIndex(headers, ['結束時間'])
+        const idxReason = findColumnIndex(headers, ['加班原因'])
+        const idxShift = findColumnIndex(headers, ['加班班別'])
+        const idxCostDepartment = findColumnIndex(headers, ['費用歸屬部門'])
+        const idxCustomer = findColumnIndex(headers, ['工單客戶'])
+        const idxWorkOrderNo = findColumnIndex(headers, ['工單號碼'])
+        const idxQuantity = findColumnIndex(headers, ['數量'])
+        const idxDueDate = findColumnIndex(headers, ['交期'])
+        const idxDescription = findColumnIndex(headers, ['加班內容說明'])
+        const idxPayType = findColumnIndex(headers, ['給付方式'])
+
+        const dataRows = rawRows.slice(headerRowIndex + 1)
+
+        const parsedRows: OvertimeImportRow[] = dataRows
+          .filter(row => String(getExcelCell(row, idxEmployeeNo) || '').trim() !== '')
           .map(row => ({
-            employee_no: String(row['員工編號'] || '').trim(),
-            employee_name: String(row['員工姓名'] || '').trim(),
-            department_name: String(row['部門名稱'] || '').trim(),
-            overtime_date: normalizeExcelDate(row['起始日期']),
-            start_time: normalizeExcelTime(row['起始時間']),
-            end_time: normalizeExcelTime(row['結束時間']),
-            reason: String(row['加班原因'] || '').trim(),
-            overtime_shift: String(row['加班班別'] || '').trim(),
-            cost_department: String(row['費用歸屬部門'] || '').trim(),
-            customer: String(row['工單客戶'] || '').trim(),
-            work_order_no: String(row['工單號碼'] || '').trim(),
-            quantity: String(row['數量'] || '').trim(),
-            due_date: normalizeExcelDate(row['交期']),
-            description: String(row['加班內容說明'] || '').trim(),
-            pay_type: String(row['給付方式'] || '').trim(),
+            employee_no: String(getExcelCell(row, idxEmployeeNo) || '').trim(),
+            employee_name: String(getExcelCell(row, idxEmployeeName) || '').trim(),
+            department_name: String(getExcelCell(row, idxDepartmentName) || '').trim(),
+            overtime_date: normalizeExcelDate(getExcelCell(row, idxOvertimeDate)),
+            start_time: normalizeExcelTime(getExcelCell(row, idxStartTime)),
+            end_time: normalizeExcelTime(getExcelCell(row, idxEndTime)),
+            reason: String(getExcelCell(row, idxReason) || '').trim(),
+            overtime_shift: String(getExcelCell(row, idxShift) || '').trim(),
+            cost_department: String(getExcelCell(row, idxCostDepartment) || '').trim(),
+            customer: String(getExcelCell(row, idxCustomer) || '').trim(),
+            work_order_no: String(getExcelCell(row, idxWorkOrderNo) || '').trim(),
+            quantity: String(getExcelCell(row, idxQuantity) || '').trim(),
+            due_date: normalizeExcelDate(getExcelCell(row, idxDueDate)),
+            description: String(getExcelCell(row, idxDescription) || '').trim(),
+            pay_type: String(getExcelCell(row, idxPayType) || '').trim(),
           }))
 
         setOvertimeImportRows(parsedRows)
         setOvertimeImportMessage(
-          t(lang, `已讀取 ${parsedRows.length} 筆加班資料`, `Loaded ${parsedRows.length} overtime row(s)`, `Đã đọc ${parsedRows.length} dòng tăng ca`)
+          t(
+            lang,
+            `已讀取 ${parsedRows.length} 筆加班資料`,
+            `Loaded ${parsedRows.length} overtime row(s)`,
+            `Đã đọc ${parsedRows.length} dòng tăng ca`
+          )
         )
       } catch (err) {
         console.error(err)
         setOvertimeImportRows([])
-        setOvertimeImportMessage(t(lang, 'Excel 讀取失敗，請確認格式', 'Failed to read Excel file. Please check the format.', 'Đọc Excel thất bại. Vui lòng kiểm tra định dạng.'))
+        setOvertimeImportMessage(
+          t(
+            lang,
+            'Excel 讀取失敗，請確認格式',
+            'Failed to read Excel file. Please check the format.',
+            'Đọc Excel thất bại. Vui lòng kiểm tra định dạng.'
+          )
+        )
       }
     }
 
@@ -1545,7 +1611,7 @@ function App() {
                               <button className="reject-btn" style={{ marginLeft: '8px' }} onClick={() => handleDeactivateEmployee(emp.employee_no)}>{t(lang, '停用', 'Deactivate', 'Vô hiệu')}</button>
                             )}
                            </td>
-                        </tr>
+                        <tr>
                       ))}
                     </tbody>
                   </table>
