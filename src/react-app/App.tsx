@@ -261,16 +261,26 @@ function normalizeExcelTime(value: unknown): string {
 function normalizeExcelDate(value: unknown): string {
   if (value === null || value === undefined || value === '') return ''
 
-  if (typeof value === 'number') {
-    const parsed = XLSX.SSF.parse_date_code(value)
-    if (!parsed) return ''
-    return `${parsed.y}-${String(parsed.m).padStart(2, '0')}-${String(parsed.d).padStart(2, '0')}`
+  const rawText = String(value).trim()
+
+  // 支援 Excel 內的 20260528 這種日期
+  if (/^\d{8}$/.test(rawText)) {
+    return `${rawText.slice(0, 4)}-${rawText.slice(4, 6)}-${rawText.slice(6, 8)}`
   }
 
-  const raw = String(value).trim().replace(/\//g, '-')
-  const d = new Date(raw)
+  // 支援 Excel 日期序號，例如 46200 這種
+  if (typeof value === 'number') {
+    const parsed = XLSX.SSF.parse_date_code(value)
+    if (parsed) {
+      return `${parsed.y}-${String(parsed.m).padStart(2, '0')}-${String(parsed.d).padStart(2, '0')}`
+    }
+  }
 
-  if (Number.isNaN(d.getTime())) return raw
+  // 支援 2026/5/28、2026-5-28
+  const normalized = rawText.replace(/\//g, '-')
+  const d = new Date(normalized)
+
+  if (Number.isNaN(d.getTime())) return ''
 
   const y = d.getFullYear()
   const m = String(d.getMonth() + 1).padStart(2, '0')
