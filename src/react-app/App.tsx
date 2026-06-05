@@ -830,7 +830,7 @@ function App() {
     }
   }
 
-  // ===== Excel 批次匯入加班（新版：動態標題查找） =====
+  // ===== Excel 批次匯入加班（新版：動態標題查找 + fallback） =====
   function handleOvertimeExcelUpload(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     if (!file) return
@@ -861,24 +861,67 @@ function App() {
         }
 
         const headers = rawRows[headerRowIndex]
+        // ── [修改 3] debug log ──
+        console.log('Excel headerRowIndex:', headerRowIndex)
+        console.log('Excel headers:', headers)
 
-        const idxEmployeeNo = findColumnIndex(headers, ['員工編號'])
-        const idxEmployeeName = findColumnIndex(headers, ['員工姓名'])
-        const idxDepartmentName = findColumnIndex(headers, ['部門名稱'])
-        const idxOvertimeDate = findColumnIndex(headers, ['起始日期'])
-        const idxStartTime = findColumnIndex(headers, ['起始時間'])
-        const idxEndTime = findColumnIndex(headers, ['結束時間'])
-        const idxReason = findColumnIndex(headers, ['加班原因'])
+        // ── [修改 2] 欄位查找 + fallback ──
+        const idxEmployeeNo =
+          findColumnIndex(headers, ['員工編號']) >= 0
+            ? findColumnIndex(headers, ['員工編號'])
+            : findColumnIndex(headers, ['員工編'])
+        const idxEmployeeName =
+          findColumnIndex(headers, ['員工姓名']) >= 0
+            ? findColumnIndex(headers, ['員工姓名'])
+            : findColumnIndex(headers, ['姓名'])
+        const idxDepartmentName =
+          findColumnIndex(headers, ['部門名稱']) >= 0
+            ? findColumnIndex(headers, ['部門名稱'])
+            : findColumnIndex(headers, ['部門'])
+        const idxOvertimeDate =
+          findColumnIndex(headers, ['起始日期']) >= 0
+            ? findColumnIndex(headers, ['起始日期'])
+            : findColumnIndex(headers, ['日期'])
+        const idxStartTime =
+          findColumnIndex(headers, ['起始時間']) >= 0
+            ? findColumnIndex(headers, ['起始時間'])
+            : findColumnIndex(headers, ['起始時'])
+        const idxEndTime =
+          findColumnIndex(headers, ['結束時間']) >= 0
+            ? findColumnIndex(headers, ['結束時間'])
+            : findColumnIndex(headers, ['結束時'])
+        const idxReason =
+          findColumnIndex(headers, ['加班原因']) >= 0
+            ? findColumnIndex(headers, ['加班原因'])
+            : findColumnIndex(headers, ['原因'])
         const idxShift = findColumnIndex(headers, ['加班班別'])
         const idxCostDepartment = findColumnIndex(headers, ['費用歸屬部門'])
         const idxCustomer = findColumnIndex(headers, ['工單客戶'])
         const idxWorkOrderNo = findColumnIndex(headers, ['工單號碼'])
         const idxQuantity = findColumnIndex(headers, ['數量'])
         const idxDueDate = findColumnIndex(headers, ['交期'])
-        const idxDescription = findColumnIndex(headers, ['加班內容說明'])
-        const idxPayType = findColumnIndex(headers, ['給付方式'])
+        const idxDescription =
+          findColumnIndex(headers, ['加班內容說明']) >= 0
+            ? findColumnIndex(headers, ['加班內容說明'])
+            : findColumnIndex(headers, ['內容說明'])
+        const idxPayType =
+          findColumnIndex(headers, ['給付方式']) >= 0
+            ? findColumnIndex(headers, ['給付方式'])
+            : findColumnIndex(headers, ['給付'])
 
         const dataRows = rawRows.slice(headerRowIndex + 1)
+        // ── [修改 3] debug log ──
+        console.log('Excel first data row:', dataRows[0])
+        console.log('Column indexes:', {
+          idxEmployeeNo,
+          idxEmployeeName,
+          idxDepartmentName,
+          idxOvertimeDate,
+          idxStartTime,
+          idxEndTime,
+          idxReason,
+          idxPayType,
+        })
 
         const parsedRows: OvertimeImportRow[] = dataRows
           .filter(row => String(getExcelCell(row, idxEmployeeNo) || '').trim() !== '')
@@ -1610,8 +1653,8 @@ function App() {
                             {emp.is_active === 1 && (
                               <button className="reject-btn" style={{ marginLeft: '8px' }} onClick={() => handleDeactivateEmployee(emp.employee_no)}>{t(lang, '停用', 'Deactivate', 'Vô hiệu')}</button>
                             )}
-                           </td>
-                        <tr>
+                          </td>
+                        </tr>
                       ))}
                     </tbody>
                   </table>
@@ -1691,7 +1734,6 @@ function App() {
                       <form onSubmit={handleOvertimeSubmit}>
                         <input value={employeeNo} readOnly placeholder={t(lang, '員工編號', 'Employee No.', 'Mã nhân viên')} />
                         <input value={employeeName} readOnly placeholder={t(lang, '姓名', 'Name', 'Tên')} />
-                        {/* 原本的加班類型下拉選單已移除 */}
                         <input type="date" value={overtimeDate} onChange={e => setOvertimeDate(e.target.value)} />
                         <div className="two">
                           <select value={overtimeStart} onChange={e => setOvertimeStart(e.target.value)}>{timeOptions.map(t => <option key={t} value={t}>{t}</option>)}</select>
@@ -1703,18 +1745,28 @@ function App() {
                         <button className="submit-btn" type="submit">{t(lang, '送出加班申請', 'Submit Overtime Request', 'Gửi đơn tăng ca')}</button>
                       </form>
 
-                      {/* Excel 匯入區塊 */}
+                      {/* ── [修改 1] Excel 匯入區塊：按鈕永遠顯示，0 筆時 disabled ── */}
                       <div style={{ marginTop: '24px', borderTop: '1px solid #ddd', paddingTop: '16px' }}>
                         <h3>{t(lang, '批次匯入加班 (Excel)', 'Batch Import Overtime (Excel)', 'Nhập hàng loạt tăng ca (Excel)')}</h3>
                         <input type="file" accept=".xlsx, .xls, .csv" onChange={handleOvertimeExcelUpload} />
-                        {overtimeImportRows.length > 0 && (
-                          <div className="note-box" style={{ marginTop: '8px' }}>
-                            {t(lang, `已載入 ${overtimeImportRows.length} 筆資料`, `Loaded ${overtimeImportRows.length} row(s)`, `Đã đọc ${overtimeImportRows.length} dòng`)}
-                            <button className="submit-btn" onClick={submitOvertimeImport} disabled={isImportingOvertime} style={{ marginLeft: '12px' }}>
-                              {isImportingOvertime ? t(lang, '匯入中...', 'Importing...', 'Đang nhập...') : t(lang, '確認匯入', 'Confirm Import', 'Xác nhận nhập')}
-                            </button>
-                          </div>
-                        )}
+                        <div className="note-box" style={{ marginTop: '8px' }}>
+                          {t(lang,
+                            `已載入 ${overtimeImportRows.length} 筆資料`,
+                            `Loaded ${overtimeImportRows.length} row(s)`,
+                            `Đã đọc ${overtimeImportRows.length} dòng`
+                          )}
+                          <button
+                            className="submit-btn"
+                            type="button"
+                            onClick={submitOvertimeImport}
+                            disabled={isImportingOvertime || overtimeImportRows.length === 0}
+                            style={{ marginTop: '12px' }}
+                          >
+                            {isImportingOvertime
+                              ? t(lang, '匯入中...', 'Importing...', 'Đang nhập...')
+                              : t(lang, '確認匯入', 'Confirm Import', 'Xác nhận nhập')}
+                          </button>
+                        </div>
                         {overtimeImportMessage && <div className="note-box">{overtimeImportMessage}</div>}
                         <p className="small">
                           {t(lang,
