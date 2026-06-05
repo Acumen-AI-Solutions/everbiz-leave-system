@@ -31,6 +31,69 @@ function getTaiwanTimeString() {
   return taiwanTime.toISOString().replace('T', ' ').slice(0, 19)
 }
 
+// ----- 新增輔助函式（用於加班自動計算）-----
+function timeToMinutesForWorker(time) {
+  const parts = String(time || '').split(':')
+  if (parts.length !== 2) return 0
+
+  const hour = Number(parts[0])
+  const minute = Number(parts[1])
+
+  if (Number.isNaN(hour) || Number.isNaN(minute)) return 0
+
+  return hour * 60 + minute
+}
+
+function calculateSimpleHoursForWorker(startTime, endTime) {
+  const start = timeToMinutesForWorker(startTime)
+  const end = timeToMinutesForWorker(endTime)
+
+  return Math.max(0, end - start) / 60
+}
+
+function determineOvertimeType(dateString) {
+  const nationalHolidays = [
+    '2026-01-01',
+    '2026-02-16',
+    '2026-02-17',
+    '2026-02-18',
+    '2026-02-19',
+    '2026-02-20',
+    '2026-02-27',
+    '2026-04-03',
+    '2026-04-06',
+    '2026-06-19',
+    '2026-09-25',
+    '2026-10-09',
+    '2027-01-01',
+    '2027-02-04',
+    '2027-02-05',
+    '2027-02-06',
+    '2027-02-08',
+    '2027-02-09',
+    '2027-03-01',
+    '2027-04-05',
+    '2027-04-06',
+    '2027-06-09',
+    '2027-09-15',
+    '2027-10-11'
+  ]
+
+  if (nationalHolidays.includes(dateString)) {
+    return 'national_holiday'
+  }
+
+  const date = new Date(`${dateString}T00:00:00+08:00`)
+  const day = date.getDay()
+
+  if (day === 0 || day === 6) {
+    return 'weekend'
+  }
+
+  return 'weekday'
+}
+// ----- 輔助函式結束 -----
+
 async function getEmployee(db, employeeNo) {
   if (!employeeNo) return null
   const stmt = await db.prepare(`
@@ -446,16 +509,18 @@ async function handleRequest(request, env) {
     })
   }
 
-  // ----- 加班申請 -----
+  // ----- 加班申請（已修改：自動判斷加班類型與時數）-----
   if (method === 'POST' && path === '/api/overtime/create') {
     const body = await request.json()
     const employeeNo = String(body.employee_no || '').trim().toUpperCase()
-    const overtimeType = String(body.overtime_type || '').trim()
     const overtimeDate = String(body.overtime_date || '').trim()
     const startTime = String(body.start_time || '').trim()
     const endTime = String(body.end_time || '').trim()
-    const totalHours = Number(body.total_hours || 0)
-    if (!employeeNo || !overtimeType || !overtimeDate || !startTime || !endTime) {
+    // 若前端未提供 total_hours，自動計算
+    const totalHours = Number(body.total_hours || calculateSimpleHoursForWorker(startTime, endTime))
+    const overtimeType = determineOvertimeType(overtimeDate)   // 自動判斷
+
+    if (!employeeNo || !overtimeDate || !startTime || !endTime) {
       return jsonResponse({ ok: false, message: '加班資料不完整' }, 400)
     }
     if (totalHours <= 0) return jsonResponse({ ok: false, message: '加班時數必須大於 0' }, 400)
@@ -482,6 +547,7 @@ async function handleRequest(request, env) {
       body.reason || '',
       hrNo, hrName, now, now
     ).run()
+
     return jsonResponse({
       ok: true,
       message: '加班申請已送出，待人資審核',
@@ -489,6 +555,145 @@ async function handleRequest(request, env) {
       current_approver_no: hrNo,
       current_approver_name: hrName,
       total_hours: totalHours
+    })
+  }
+
+  // ----- Excel 批次匯入加班申請（新增）-----
+  if (method === 'POST' && path === '/api/overtime/import') {
+    const body = await request.json()
+    const importerNo = String(body.importer_no || '').trim().toUpperCase()
+    const rows = Array.isArray(body.rows) ? body.rows : []
+
+    if (!importerNo) {
+      return jsonResponse({ ok: false, message: '缺少 importer_no' }, 400)
+    }
+
+    if (rows.length === 0) {
+      return jsonResponse({ ok: false, message: '沒有可匯入的加班資料' }, 400)
+    }
+
+    const importer = await getEmployee(env.DB, importerNo)
+    if (!importer) {
+      return jsonResponse({ ok: false, message: '匯入人員不存在或已停用' }, 404)
+    }
+
+    const importBatchId = `OT-${Date.now()}`
+    const now = getTaiwanTimeString()
+
+    let inserted = 0
+    const errors = []
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i]
+      const lineNo = i + 2
+
+      const employeeNo = String(row.employee_no || '').trim().toUpperCase()
+      const overtimeDate = String(row.overtime_date || '').trim()
+      const startTime = String(row.start_time || '').trim()
+      const endTime = String(row.end_time || '').trim()
+      const reason = String(row.reason || '').trim()
+      const payType = String(row.pay_type || '').trim()
+
+      if (!employeeNo) {
+        errors.push(`第 ${lineNo} 列缺少員工編號`)
+        continue
+      }
+
+      if (!overtimeDate || !startTime || !endTime) {
+        errors.push(`第 ${lineNo} 列缺少日期或時間`)
+        continue
+      }
+
+      if (!reason) {
+        errors.push(`第 ${lineNo} 列缺少加班原因`)
+        continue
+      }
+
+      if (!payType) {
+        errors.push(`第 ${lineNo} 列缺少給付方式`)
+        continue
+      }
+
+      const employee = await getEmployee(env.DB, employeeNo)
+      if (!employee) {
+        errors.push(`第 ${lineNo} 列員工不存在或已停用：${employeeNo}`)
+        continue
+      }
+
+      const totalHours = calculateSimpleHoursForWorker(startTime, endTime)
+
+      if (totalHours <= 0) {
+        errors.push(`第 ${lineNo} 列加班時數必須大於 0`)
+        continue
+      }
+
+      const overtimeType = determineOvertimeType(overtimeDate)
+
+      const hrNo = getHrNo(env)
+      const hrName = await getEmployeeName(env.DB, hrNo)
+
+      await env.DB.prepare(`
+        INSERT INTO overtime_requests (
+          employee_no,
+          employee_name,
+          department_name,
+          overtime_type,
+          overtime_date,
+          start_time,
+          end_time,
+          total_hours,
+          reason,
+          overtime_shift,
+          cost_department,
+          customer,
+          work_order_no,
+          quantity,
+          due_date,
+          description,
+          pay_type,
+          import_batch_id,
+          source_type,
+          status,
+          approval_stage,
+          current_approver_no,
+          current_approver_name,
+          created_at,
+          updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'excel', 'pending', 'hr', ?, ?, ?, ?)
+      `).bind(
+        employee.employee_no,
+        employee.employee_name,
+        row.department_name || employee.department_name || '',
+        overtimeType,
+        overtimeDate,
+        startTime,
+        endTime,
+        totalHours,
+        reason,
+        row.overtime_shift || '',
+        row.cost_department || '',
+        row.customer || '',
+        row.work_order_no || '',
+        row.quantity || '',
+        row.due_date || '',
+        row.description || '',
+        payType,
+        importBatchId,
+        hrNo,
+        hrName,
+        now,
+        now
+      ).run()
+
+      inserted++
+    }
+
+    return jsonResponse({
+      ok: true,
+      message: `匯入完成，成功 ${inserted} 筆，錯誤 ${errors.length} 筆`,
+      inserted,
+      errors,
+      import_batch_id: importBatchId
     })
   }
 
