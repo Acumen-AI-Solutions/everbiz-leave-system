@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import * as XLSX from 'xlsx'
 import './App.css'
 
 const API_BASE = 'https://everbiz-leave-api.imd13.workers.dev'
@@ -121,6 +122,25 @@ type OvertimeRecord = {
   updated_at: string
 }
 
+// 匯入用的列定義
+type OvertimeImportRow = {
+  employee_no: string
+  employee_name: string
+  department_name: string
+  overtime_date: string
+  start_time: string
+  end_time: string
+  reason: string
+  overtime_shift: string
+  cost_department: string
+  customer: string
+  work_order_no: string
+  quantity: string
+  due_date: string
+  description: string
+  pay_type: string
+}
+
 type LeaveTypeOption = {
   code: string
   name_zh: string
@@ -216,6 +236,47 @@ function calculateLeaveHours(
 
 function calculateSimpleHours(startTime: string, endTime: string): number {
   return Math.max(0, timeToMinutes(endTime) - timeToMinutes(startTime)) / 60
+}
+
+// ===== Excel 輔助函數 =====
+function normalizeExcelTime(value: unknown): string {
+  if (value === null || value === undefined || value === '') return ''
+
+  if (typeof value === 'number') {
+    const text = String(Math.round(value)).padStart(4, '0')
+    return `${text.slice(0, 2)}:${text.slice(2, 4)}`
+  }
+
+  const raw = String(value).trim()
+
+  if (raw.includes(':')) {
+    const [h, m] = raw.split(':')
+    return `${h.padStart(2, '0')}:${String(m || '00').padStart(2, '0')}`
+  }
+
+  const text = raw.padStart(4, '0')
+  return `${text.slice(0, 2)}:${text.slice(2, 4)}`
+}
+
+function normalizeExcelDate(value: unknown): string {
+  if (value === null || value === undefined || value === '') return ''
+
+  if (typeof value === 'number') {
+    const parsed = XLSX.SSF.parse_date_code(value)
+    if (!parsed) return ''
+    return `${parsed.y}-${String(parsed.m).padStart(2, '0')}-${String(parsed.d).padStart(2, '0')}`
+  }
+
+  const raw = String(value).trim().replace(/\//g, '-')
+  const d = new Date(raw)
+
+  if (Number.isNaN(d.getTime())) return raw
+
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+
+  return `${y}-${m}-${day}`
 }
 
 function statusText(status: string, lang: Lang) {
@@ -319,13 +380,17 @@ function App() {
   const [punchReason, setPunchReason] = useState('')
   const [punchMessage, setPunchMessage] = useState('')
 
-  // Overtime form
+  // Overtime form (移除 overtimeType state)
   const [overtimeDate, setOvertimeDate] = useState('')
   const [overtimeStart, setOvertimeStart] = useState('17:30')
   const [overtimeEnd, setOvertimeEnd] = useState('19:30')
-  const [overtimeType, setOvertimeType] = useState('平日加班')
   const [overtimeReason, setOvertimeReason] = useState('')
   const [overtimeMessage, setOvertimeMessage] = useState('')
+
+  // 加班批次匯入狀態
+  const [overtimeImportRows, setOvertimeImportRows] = useState<OvertimeImportRow[]>([])
+  const [overtimeImportMessage, setOvertimeImportMessage] = useState('')
+  const [isImportingOvertime, setIsImportingOvertime] = useState(false)
 
   // Approvals
   const [approverNo, setApproverNo] = useState('')
@@ -641,7 +706,7 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           employee_no: normalizedEmployeeNo,
-          leave_type: leaveType,  // ★ 現在送出的是 code，如 personal_leave
+          leave_type: leaveType,
           start_date: startDate, start_time: startTime,
           end_date: endDate, end_time: endTime,
           total_hours: totalHours, reason,
@@ -705,7 +770,7 @@ function App() {
     }
   }
 
-  // ----- 加班送出 -----
+  // ----- 加班送出（已移除 overtime_type）-----
   async function handleOvertimeSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const overtimeHours = calculateSimpleHours(overtimeStart, overtimeEnd)
@@ -718,9 +783,12 @@ function App() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          employee_no: employeeNo, overtime_type: overtimeType,
-          overtime_date: overtimeDate, start_time: overtimeStart, end_time: overtimeEnd,
-          total_hours: overtimeHours, reason: overtimeReason,
+          employee_no: employeeNo,
+          overtime_date: overtimeDate,
+          start_time: overtimeStart,
+          end_time: overtimeEnd,
+          total_hours: overtimeHours,
+          reason: overtimeReason,
         }),
       })
       const data = await response.json()
@@ -737,6 +805,123 @@ function App() {
       await loadMyOvertimesSilent()
     } catch {
       setOvertimeMessage(t(lang, '加班申請送出失敗，請確認 /api/overtime/create 是否正常', 'Submission failed. Please check /api/overtime/create.', 'Gửi thất bại. Vui lòng kiểm tra /api/overtime/create.'))
+    }
+  }
+
+  // ===== Excel 批次匯入加班 =====
+  function handleOvertimeExcelUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+
+    reader.onload = e => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer)
+        const workbook = XLSX.read(data, { type: 'array' })
+        const sheetName = workbook.SheetNames[0]
+        const worksheet = workbook.Sheets[sheetName]
+
+        const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, {
+          defval: '',
+        })
+
+        const parsedRows: OvertimeImportRow[] = rows
+          .filter(row => String(row['員工編號'] || '').trim() !== '')
+          .map(row => ({
+            employee_no: String(row['員工編號'] || '').trim(),
+            employee_name: String(row['員工姓名'] || '').trim(),
+            department_name: String(row['部門名稱'] || '').trim(),
+            overtime_date: normalizeExcelDate(row['起始日期']),
+            start_time: normalizeExcelTime(row['起始時間']),
+            end_time: normalizeExcelTime(row['結束時間']),
+            reason: String(row['加班原因'] || '').trim(),
+            overtime_shift: String(row['加班班別'] || '').trim(),
+            cost_department: String(row['費用歸屬部門'] || '').trim(),
+            customer: String(row['工單客戶'] || '').trim(),
+            work_order_no: String(row['工單號碼'] || '').trim(),
+            quantity: String(row['數量'] || '').trim(),
+            due_date: normalizeExcelDate(row['交期']),
+            description: String(row['加班內容說明'] || '').trim(),
+            pay_type: String(row['給付方式'] || '').trim(),
+          }))
+
+        setOvertimeImportRows(parsedRows)
+        setOvertimeImportMessage(
+          t(lang, `已讀取 ${parsedRows.length} 筆加班資料`, `Loaded ${parsedRows.length} overtime row(s)`, `Đã đọc ${parsedRows.length} dòng tăng ca`)
+        )
+      } catch (err) {
+        console.error(err)
+        setOvertimeImportRows([])
+        setOvertimeImportMessage(t(lang, 'Excel 讀取失敗，請確認格式', 'Failed to read Excel file. Please check the format.', 'Đọc Excel thất bại. Vui lòng kiểm tra định dạng.'))
+      }
+    }
+
+    reader.readAsArrayBuffer(file)
+  }
+
+  function validateOvertimeImportRows(rows: OvertimeImportRow[]) {
+    const errors: string[] = []
+
+    rows.forEach((row, index) => {
+      const line = index + 2
+
+      if (!row.employee_no) errors.push(`第 ${line} 列缺少員工編號`)
+      if (!row.overtime_date) errors.push(`第 ${line} 列缺少起始日期`)
+      if (!row.start_time) errors.push(`第 ${line} 列缺少起始時間`)
+      if (!row.end_time) errors.push(`第 ${line} 列缺少結束時間`)
+      if (!row.reason) errors.push(`第 ${line} 列缺少加班原因`)
+      if (!row.pay_type) errors.push(`第 ${line} 列缺少給付方式`)
+    })
+
+    return errors
+  }
+
+  async function submitOvertimeImport() {
+    if (!currentUser) return
+
+    const errors = validateOvertimeImportRows(overtimeImportRows)
+
+    if (errors.length > 0) {
+      setOvertimeImportMessage(errors.join('\n'))
+      return
+    }
+
+    setIsImportingOvertime(true)
+    setOvertimeImportMessage(t(lang, '匯入中...', 'Importing...', 'Đang nhập...'))
+
+    try {
+      const res = await fetch(`${API_BASE}/api/overtime/import`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          importer_no: currentUser.employee_no,
+          rows: overtimeImportRows,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (!data.ok) {
+        setOvertimeImportMessage(data.message || t(lang, '匯入失敗', 'Import failed', 'Nhập thất bại'))
+        return
+      }
+
+      const errorText =
+        data.errors && data.errors.length > 0
+          ? `\n${data.errors.join('\n')}`
+          : ''
+
+      setOvertimeImportMessage(
+        `${data.message || t(lang, '匯入完成', 'Import complete', 'Nhập hoàn tất')}${errorText}`
+      )
+
+      setOvertimeImportRows([])
+      await loadMyOvertimesSilent()
+    } catch {
+      setOvertimeImportMessage(t(lang, '匯入失敗，請確認 /api/overtime/import 是否正常', 'Import failed. Please check /api/overtime/import.', 'Nhập thất bại. Vui lòng kiểm tra /api/overtime/import.'))
+    } finally {
+      setIsImportingOvertime(false)
     }
   }
 
@@ -1091,7 +1276,6 @@ function App() {
     ]
     const rows = hrLeaves.map(leave => [
       leave.id, leave.employee_no, leave.employee_name,
-      // ★ CSV 匯出假別改用 getLeaveTypeDisplayName，顯示語系對應名稱
       getLeaveTypeDisplayName(leave.leave_type),
       leave.start_date, leave.start_time || '', leave.end_date, leave.end_time || '',
       leave.total_hours ?? '', leave.reason || '', statusText(leave.status, lang),
@@ -1347,7 +1531,10 @@ function App() {
                     <tbody>
                       {hrEmployees.map(emp => (
                         <tr key={emp.employee_no}>
-                          <td>{emp.employee_no}</td><td>{emp.employee_name}</td><td>{emp.department_name}</td><td>{emp.position_title}</td>
+                          <td>{emp.employee_no}</td>
+                          <td>{emp.employee_name}</td>
+                          <td>{emp.department_name}</td>
+                          <td>{emp.position_title}</td>
                           <td>{emp.direct_manager_name} ({emp.direct_manager_no})</td>
                           <td>{emp.first_proxy_name} ({emp.first_proxy_no})</td>
                           <td>{emp.second_proxy_name} ({emp.second_proxy_no})</td>
@@ -1357,7 +1544,7 @@ function App() {
                             {emp.is_active === 1 && (
                               <button className="reject-btn" style={{ marginLeft: '8px' }} onClick={() => handleDeactivateEmployee(emp.employee_no)}>{t(lang, '停用', 'Deactivate', 'Vô hiệu')}</button>
                             )}
-                          </td>
+                           </td>
                         </tr>
                       ))}
                     </tbody>
@@ -1387,7 +1574,6 @@ function App() {
                       <form onSubmit={handleSubmit}>
                         <input value={employeeNo} readOnly placeholder={t(lang, '員工編號', 'Employee No.', 'Mã nhân viên')} />
                         <input value={employeeName} readOnly placeholder={t(lang, '姓名', 'Name', 'Tên')} />
-                        {/* ★ value 改用 code，option 顯示對應語系名稱 */}
                         <select value={leaveType} onChange={e => setLeaveType(e.target.value)}>
                           {leaveTypeOptions.map(item => (
                             <option key={item.code} value={item.code}>
@@ -1439,12 +1625,7 @@ function App() {
                       <form onSubmit={handleOvertimeSubmit}>
                         <input value={employeeNo} readOnly placeholder={t(lang, '員工編號', 'Employee No.', 'Mã nhân viên')} />
                         <input value={employeeName} readOnly placeholder={t(lang, '姓名', 'Name', 'Tên')} />
-                        <select value={overtimeType} onChange={e => setOvertimeType(e.target.value)}>
-                          <option>{t(lang, '平日加班', 'Weekday Overtime', 'Tăng ca ngày thường')}</option>
-                          <option>{t(lang, '休息日加班', 'Rest Day Overtime', 'Tăng ca ngày nghỉ')}</option>
-                          <option>{t(lang, '例假日加班', 'Weekly Day-off Overtime', 'Tăng ca ngày nghỉ lễ')}</option>
-                          <option>{t(lang, '國定假日加班', 'National Holiday Overtime', 'Tăng ca ngày quốc lễ')}</option>
-                        </select>
+                        {/* 原本的加班類型下拉選單已移除 */}
                         <input type="date" value={overtimeDate} onChange={e => setOvertimeDate(e.target.value)} />
                         <div className="two">
                           <select value={overtimeStart} onChange={e => setOvertimeStart(e.target.value)}>{timeOptions.map(t => <option key={t} value={t}>{t}</option>)}</select>
@@ -1455,6 +1636,28 @@ function App() {
                         <div className="note-box">{t(lang, '簽核流程：人資 → 直屬主管', 'Approval flow: HR → Direct Supervisor', 'Quy trình duyệt: Nhân sự → Quản lý trực tiếp')}</div>
                         <button className="submit-btn" type="submit">{t(lang, '送出加班申請', 'Submit Overtime Request', 'Gửi đơn tăng ca')}</button>
                       </form>
+
+                      {/* Excel 匯入區塊 */}
+                      <div style={{ marginTop: '24px', borderTop: '1px solid #ddd', paddingTop: '16px' }}>
+                        <h3>{t(lang, '批次匯入加班 (Excel)', 'Batch Import Overtime (Excel)', 'Nhập hàng loạt tăng ca (Excel)')}</h3>
+                        <input type="file" accept=".xlsx, .xls, .csv" onChange={handleOvertimeExcelUpload} />
+                        {overtimeImportRows.length > 0 && (
+                          <div className="note-box" style={{ marginTop: '8px' }}>
+                            {t(lang, `已載入 ${overtimeImportRows.length} 筆資料`, `Loaded ${overtimeImportRows.length} row(s)`, `Đã đọc ${overtimeImportRows.length} dòng`)}
+                            <button className="submit-btn" onClick={submitOvertimeImport} disabled={isImportingOvertime} style={{ marginLeft: '12px' }}>
+                              {isImportingOvertime ? t(lang, '匯入中...', 'Importing...', 'Đang nhập...') : t(lang, '確認匯入', 'Confirm Import', 'Xác nhận nhập')}
+                            </button>
+                          </div>
+                        )}
+                        {overtimeImportMessage && <div className="note-box">{overtimeImportMessage}</div>}
+                        <p className="small">
+                          {t(lang,
+                            'Excel 欄位名稱對應：員工編號、員工姓名、部門名稱、起始日期、起始時間、結束時間、加班原因、加班班別、費用歸屬部門、工單客戶、工單號碼、數量、交期、加班內容說明、給付方式。日期格式支援 YYYY-MM-DD 或 Excel 數字日期；時間格式支援 HHMM 或 HH:MM。',
+                            'Excel column mapping: Employee No., Employee Name, Department Name, Overtime Date, Start Time, End Time, Reason, Overtime Shift, Cost Department, Customer, Work Order No., Quantity, Due Date, Description, Pay Type. Date supports YYYY-MM-DD or Excel numeric date; time supports HHMM or HH:MM.',
+                            'Ánh xạ cột Excel: Mã NV, Tên NV, Tên bộ phận, Ngày tăng ca, Giờ bắt đầu, Giờ kết thúc, Lý do, Ca tăng ca, Bộ phận chi phí, Khách hàng, Số lệnh SX, Số lượng, Ngày giao hàng, Mô tả nội dung, Hình thức thanh toán. Ngày hỗ trợ YYYY-MM-DD hoặc số Excel; giờ hỗ trợ HHMM hoặc HH:MM.'
+                          )}
+                        </p>
+                      </div>
                     </>
                   )}
                 </section>
@@ -1490,7 +1693,6 @@ function App() {
                   <div className="summary">
                     <div><span>{t(lang, '假單編號', 'Request ID', 'Mã đơn')}</span><strong>{result.leaveRequestId || '-'}</strong></div>
                     <div><span>{t(lang, '員工', 'Employee', 'Nhân viên')}</span><strong>{result.employeeNo} {result.employeeName}</strong></div>
-                    {/* ★ 結果顯示也用 getLeaveTypeDisplayName */}
                     <div><span>{t(lang, '假別', 'Leave Type', 'Loại nghỉ')}</span><strong>{getLeaveTypeDisplayName(result.leaveType)}</strong></div>
                     <div><span>{t(lang, '期間', 'Period', 'Thời gian')}</span><strong>{result.startDate} {result.startTime} ~ {result.endDate} {result.endTime}</strong></div>
                     <div><span>{t(lang, '時數', 'Hours', 'Số giờ')}</span><strong>{result.totalHours} {t(lang, '小時', 'hr(s)', 'giờ')}</strong></div>
@@ -1523,7 +1725,6 @@ function App() {
                         {myLeaves.map(leave => (
                           <div className="approval-item" key={leave.id}>
                             <div>
-                              {/* ★ 我的紀錄也用 getLeaveTypeDisplayName */}
                               <strong>#{leave.id}｜{getLeaveTypeDisplayName(leave.leave_type)}｜{statusText(leave.status, lang)}</strong>
                               <p>{t(lang, '日期', 'Date', 'Ngày')}：{leave.start_date} {leave.start_time || ''} ~ {leave.end_date} {leave.end_time || ''}</p>
                               <p>{t(lang, '時數', 'Hours', 'Số giờ')}：{leave.total_hours ?? '-'} {t(lang, '小時', 'hr(s)', 'giờ')}</p>
@@ -1614,7 +1815,6 @@ function App() {
                       <div className="approval-item" key={leave.id}>
                         <div>
                           <strong>#{leave.id}｜{leave.employee_no} {leave.employee_name}</strong>
-                          {/* ★ 待審核也用 getLeaveTypeDisplayName */}
                           <p>{getLeaveTypeDisplayName(leave.leave_type)}｜{leave.start_date} {leave.start_time || ''} ~ {leave.end_date} {leave.end_time || ''}</p>
                           <p>{t(lang, '時數', 'Hours', 'Số giờ')}：{leave.total_hours ?? '-'} {t(lang, '小時', 'hr(s)', 'giờ')}</p>
                           <p>{t(lang, '原因', 'Reason', 'Lý do')}：{leave.reason || t(lang, '未填寫', 'N/A', 'Chưa điền')}</p>
@@ -1693,7 +1893,6 @@ function App() {
                       {hrLeaves.map(leave => (
                         <div className="approval-item" key={`hr-leave-${leave.id}`}>
                           <div>
-                            {/* ★ HR 報表假別顯示也用 getLeaveTypeDisplayName */}
                             <strong>#{leave.id}｜{leave.employee_no} {leave.employee_name}｜{statusText(leave.status, lang)}</strong>
                             <p>{getLeaveTypeDisplayName(leave.leave_type)}｜{leave.start_date} {leave.start_time || ''} ~ {leave.end_date} {leave.end_time || ''}</p>
                             <p>{t(lang, '時數', 'Hours', 'Số giờ')}：{leave.total_hours ?? '-'} {t(lang, '小時', 'hr(s)', 'giờ')}</p>
