@@ -56,7 +56,6 @@ body {
   flex-wrap: wrap;
 }
 
-/* 原有 menu button 樣式保留（作為 backup） */
 .menu button {
   border: 0;
   background: #f8fafc;
@@ -73,7 +72,6 @@ body {
   color: #115e59;
 }
 
-/* 新增 nav-btn 樣式（與 menu button 不衝突） */
 .nav-btn {
   border: 0;
   background: #f8fafc;
@@ -112,7 +110,6 @@ body {
   animation: none;
 }
 
-/* 確保同時有 active 和 danger 時仍為紅色（覆蓋藍色） */
 .nav-btn.danger,
 .nav-btn.active.danger {
   background-color: #dc3545 !important;
@@ -120,7 +117,6 @@ body {
   animation: pulse 0.8s infinite;
 }
 
-/* 閃爍動畫提醒 */
 @keyframes pulse {
   0% { opacity: 1; }
   50% { opacity: 0.65; }
@@ -188,7 +184,7 @@ body {
   border-radius: 24px;
   padding: 28px;
   box-shadow: 0 12px 35px rgba(15,23,42,0.08);
-  overflow-x: auto;   /* 允許表格左右滑動 */
+  overflow-x: auto;
   overflow-y: visible;
 }
 
@@ -263,7 +259,7 @@ tr:last-child td {
   border-bottom: 0;
 }
 
-/* 員工管理表格專用樣式（自動寬度、不換行、操作欄按鈕水平排列） */
+/* 員工表格樣式：自動寬度、不換行、操作欄按鈕水平排列 */
 .employee-table {
   width: max-content;
   min-width: 100%;
@@ -279,7 +275,6 @@ tr:last-child td {
   line-height: 1.45;
 }
 
-/* 操作欄（第九欄）強制水平排列按鈕 */
 .employee-table th:nth-child(9),
 .employee-table td:nth-child(9) {
   min-width: 190px;
@@ -303,21 +298,17 @@ tr:last-child td {
   .hero {
     display: block;
   }
-
   .menu {
     margin-top: 16px;
   }
-
   .badge {
     display: inline-block;
     margin-top: 18px;
   }
-
   .grid,
   .two {
     grid-template-columns: 1fr;
   }
-
   .logo-wrap img {
     width: 220px;
   }
@@ -327,22 +318,18 @@ tr:last-child td {
   .page {
     padding: 12px;
   }
-
   .top-nav,
   .hero,
   .card {
     border-radius: 18px;
   }
-
   .menu button,
   .nav-btn {
     width: 100%;
   }
-
   .brand img {
     width: 105px;
   }
-
   .logo-wrap img {
     width: 200px;
   }
@@ -495,19 +482,15 @@ button:disabled {
   .approval-search {
     grid-template-columns: 1fr;
   }
-
   .approval-search .submit-btn {
     width: 100%;
   }
-
   .approval-item {
     display: block;
   }
-
   .approval-actions {
     margin-top: 14px;
   }
-
   .approve-btn,
   .reject-btn {
     width: 100%;
@@ -537,7 +520,6 @@ input[readonly] {
   color: #475569;
 }
 
-/* 表單分頁按鈕 */
 .form-tabs {
   display: flex;
   flex-wrap: wrap;
@@ -576,7 +558,6 @@ input[readonly] {
   }
 }
 
-/* 員工管理專用樣式 */
 .employee-active-row {
   margin-top: 12px;
   display: flex;
