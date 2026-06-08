@@ -73,7 +73,7 @@ body {
   color: #115e59;
 }
 
-/* 新增 nav-btn 樣式（優先級更高，與 menu button 不衝突） */
+/* 新增 nav-btn 樣式（與 menu button 不衝突） */
 .nav-btn {
   border: 0;
   background: #f8fafc;
@@ -110,6 +110,14 @@ body {
 .nav-btn.danger:hover {
   background-color: #b02a37;
   animation: none;
+}
+
+/* 確保同時有 active 和 danger 時仍為紅色（覆蓋藍色） */
+.nav-btn.danger,
+.nav-btn.active.danger {
+  background-color: #dc3545 !important;
+  color: white !important;
+  animation: pulse 0.8s infinite;
 }
 
 /* 閃爍動畫提醒 */
@@ -180,6 +188,7 @@ body {
   border-radius: 24px;
   padding: 28px;
   box-shadow: 0 12px 35px rgba(15,23,42,0.08);
+  overflow-x: auto; /* 讓表格過寬時可以滾動 */
 }
 
 .card h2 {
@@ -251,6 +260,25 @@ th {
 
 tr:last-child td {
   border-bottom: 0;
+}
+
+/* 員工管理表格專用樣式（保留用戶指定的部分） */
+.employee-table {
+  width: max-content;
+  min-width: 100%;
+  table-layout: auto;
+}
+
+.employee-table th,
+.employee-table td {
+  vertical-align: middle;
+  white-space: nowrap;
+  word-break: normal;
+}
+
+.employee-table th:nth-child(9),
+.employee-table td:nth-child(9) {
+  text-align: center;
 }
 
 @media (max-width: 850px) {
@@ -568,64 +596,4 @@ input[readonly] {
 .employee-form-actions .reject-btn {
   width: auto;
   margin-bottom: 0;
-}
-.nav-btn.danger,
-.nav-btn.active.danger {
-  background-color: #dc3545 !important;
-  color: white !important;
-  animation: pulse 0.8s infinite;
-}
-/* 員工管理表格整理 */
-.employee-table {
-  table-layout: fixed;
-}
-
-.employee-table th,
-.employee-table td {
-  vertical-align: middle;
-  word-break: keep-all;
-}
-
-.employee-table th:nth-child(1),
-.employee-table td:nth-child(1) {
-  width: 90px;
-}
-
-.employee-table th:nth-child(2),
-.employee-table td:nth-child(2) {
-  width: 90px;
-}
-
-.employee-table th:nth-child(3),
-.employee-table td:nth-child(3) {
-  width: 120px;
-}
-
-.employee-table th:nth-child(4),
-.employee-table td:nth-child(4) {
-  width: 90px;
-}
-
-.employee-table th:nth-child(5),
-.employee-table td:nth-child(5) {
-  width: 160px;
-}
-
-.employee-table th:nth-child(6),
-.employee-table td:nth-child(6),
-.employee-table th:nth-child(7),
-.employee-table td:nth-child(7) {
-  width: 160px;
-}
-
-.employee-table th:nth-child(8),
-.employee-table td:nth-child(8) {
-  width: 60px;
-  text-align: center;
-}
-
-.employee-table th:nth-child(9),
-.employee-table td:nth-child(9) {
-  width: 90px;
-  text-align: center;
 }
