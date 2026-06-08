@@ -105,10 +105,12 @@ type PunchRecord = {
   updated_at: string
 }
 
+// 完整 OvertimeRecord，含 RPA 匯出欄位
 type OvertimeRecord = {
   id: number
   employee_no: string
   employee_name: string
+  department_name: string
   overtime_type: string
   overtime_date: string
   start_time: string
@@ -120,6 +122,14 @@ type OvertimeRecord = {
   current_approver_name: string
   created_at: string
   updated_at: string
+  overtime_shift?: string
+  cost_department?: string
+  customer?: string
+  work_order_no?: string
+  quantity?: string
+  due_date?: string
+  description?: string
+  pay_type?: string
 }
 
 type OvertimeImportRow = {
@@ -153,13 +163,14 @@ type SectionType = 'form' | 'approvals' | 'hr' | 'employees'
 type RecordTab = 'leave' | 'punch' | 'overtime'
 type Lang = 'zh' | 'en' | 'vi'
 
-// ==================== 輔助函數 ====================
+// ==================== 多語系輔助 ====================
 function t(lang: Lang, zh: string, en: string, vi: string): string {
   if (lang === 'en') return en
   if (lang === 'vi') return vi
   return zh
 }
 
+// ==================== 時間選項與計算 ====================
 const timeOptions = [
   '08:00', '08:30', '09:00', '09:30', '10:00', '10:30',
   '11:00', '11:30', '12:00', '12:30', '13:00', '13:30',
@@ -237,6 +248,7 @@ function calculateSimpleHours(startTime: string, endTime: string): number {
   return Math.max(0, timeToMinutes(endTime) - timeToMinutes(startTime)) / 60
 }
 
+// ==================== Excel 輔助函數 ====================
 function normalizeExcelTime(value: unknown): string {
   if (value === null || value === undefined || value === '') return ''
   if (typeof value === 'number') {
@@ -289,6 +301,7 @@ function getExcelCell(row: unknown[], index: number): unknown {
   return row[index] ?? ''
 }
 
+// ==================== 狀態與 CSV 輔助 ====================
 function statusText(status: string, lang: Lang) {
   if (status === 'pending') return t(lang, '待審核', 'Pending', 'Chờ duyệt')
   if (status === 'approved') return t(lang, '已核准', 'Approved', 'Đã duyệt')
@@ -1270,7 +1283,7 @@ function App() {
     }
   }
 
-  // ===== 三個匯出函數（新版，自動抓取最新資料）=====
+  // ===== 匯出函數（自動補抓最新資料）=====
   async function exportHrLeavesCsv() {
     let leaveData = hrLeaves
 
@@ -1387,6 +1400,7 @@ function App() {
     setHrMessage(t(lang, `已匯出 ${punchData.length} 筆補卡 / 忘刷報表`, `Exported ${punchData.length} punch record(s)`, `Đã xuất ${punchData.length} bản ghi`))
   }
 
+  // ★ 加班匯出符合 RPA 欄位順序（共 17 欄）
   async function exportHrOvertimesCsv() {
     let overtimeData = hrOvertimes
 
@@ -1409,37 +1423,43 @@ function App() {
     }
 
     const headers = [
-      t(lang, '加班編號', 'ID', 'Mã đơn'),
       t(lang, '員工編號', 'Employee No.', 'Mã NV'),
       t(lang, '姓名', 'Name', 'Tên'),
-      t(lang, '加班類型', 'Overtime Type', 'Loại tăng ca'),
+      t(lang, '部門名稱', 'Department', 'Bộ phận'),
       t(lang, '加班日期', 'Overtime Date', 'Ngày tăng ca'),
       t(lang, '開始時間', 'Start Time', 'Giờ bắt đầu'),
       t(lang, '結束時間', 'End Time', 'Giờ kết thúc'),
       t(lang, '時數', 'Hours', 'Số giờ'),
-      t(lang, '原因', 'Reason', 'Lý do'),
+      t(lang, '加班原因', 'Reason', 'Lý do'),
+      t(lang, '加班班別', 'Overtime Shift', 'Ca tăng ca'),
+      t(lang, '費用歸屬部門', 'Cost Department', 'Bộ phận chi phí'),
+      t(lang, '工單客戶', 'Customer', 'Khách hàng'),
+      t(lang, '工單號碼', 'Work Order No.', 'Số lệnh SX'),
+      t(lang, '數量', 'Quantity', 'Số lượng'),
+      t(lang, '交期', 'Due Date', 'Ngày giao hàng'),
+      t(lang, '加班內容說明', 'Description', 'Mô tả nội dung'),
+      t(lang, '給付方式', 'Pay Type', 'Hình thức thanh toán'),
       t(lang, '狀態', 'Status', 'Trạng thái'),
-      t(lang, '審核主管編號', 'Approver No.', 'Mã quản lý'),
-      t(lang, '審核主管姓名', 'Approver Name', 'Tên quản lý'),
-      t(lang, '建立時間', 'Created At', 'Thời gian tạo'),
-      t(lang, '更新時間', 'Updated At', 'Thời gian cập nhật'),
     ]
 
     const rows = overtimeData.map(ot => [
-      ot.id,
       ot.employee_no,
       ot.employee_name,
-      ot.overtime_type,
+      ot.department_name || '',
       ot.overtime_date,
       ot.start_time,
       ot.end_time,
       ot.total_hours ?? '',
       ot.reason || '',
+      ot.overtime_shift || '',
+      ot.cost_department || '',
+      ot.customer || '',
+      ot.work_order_no || '',
+      ot.quantity || '',
+      ot.due_date || '',
+      ot.description || '',
+      ot.pay_type || '',
       statusText(ot.status, lang),
-      ot.current_approver_no,
-      ot.current_approver_name,
-      ot.created_at,
-      ot.updated_at,
     ])
 
     downloadCsv(rows, headers, `HR_${t(lang, '加班報表', 'Overtime_Report', 'Bao_cao_tang_ca')}`)
