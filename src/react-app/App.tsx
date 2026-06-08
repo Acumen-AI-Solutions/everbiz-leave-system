@@ -473,6 +473,11 @@ function App() {
     pendingLeaves.length > 0 ||
     pendingPunches.length > 0 ||
     pendingOvertimes.length > 0
+  useEffect(() => {
+  if (currentUser?.employee_no) {
+    loadPendingApprovals()
+  }
+}, [currentUser?.employee_no])
 
   // ----- 載入假別 -----
   async function loadLeaveTypes() {
