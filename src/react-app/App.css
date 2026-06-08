@@ -189,7 +189,7 @@ body {
   padding: 28px;
   box-shadow: 0 12px 35px rgba(15,23,42,0.08);
   overflow-x: auto;
-  overflow-y: visible; /* 只允許左右滑，不要上下撐高 */
+  overflow-y: visible;
 }
 
 .card h2 {
@@ -263,25 +263,39 @@ tr:last-child td {
   border-bottom: 0;
 }
 
-/* 員工管理表格專用樣式（自動寬度、不換行、左右滑動） */
+/* 員工管理表格專用樣式（固定欄寬、允許換行，關鍵欄位不換行） */
 .employee-table {
-  width: max-content;
-  min-width: 100%;
-  table-layout: auto;
+  width: 100%;
+  table-layout: fixed;
 }
 
 .employee-table th,
 .employee-table td {
-  padding: 12px 14px;
+  padding: 12px 8px;
   vertical-align: middle;
-  white-space: nowrap;
-  word-break: keep-all;
+  word-break: break-word;
+  line-height: 1.45;
 }
 
+/* 姓名欄位不換行 */
+.employee-table th:nth-child(2),
+.employee-table td:nth-child(2) {
+  white-space: nowrap;
+}
+
+/* 狀態欄位不換行、置中、固定寬度 */
 .employee-table th:nth-child(8),
-.employee-table td:nth-child(8),
+.employee-table td:nth-child(8) {
+  width: 70px;
+  white-space: nowrap;
+  text-align: center;
+}
+
+/* 操作欄位不換行、置中、固定寬度 */
 .employee-table th:nth-child(9),
 .employee-table td:nth-child(9) {
+  width: 110px;
+  white-space: nowrap;
   text-align: center;
 }
 
