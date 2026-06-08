@@ -188,7 +188,7 @@ body {
   border-radius: 24px;
   padding: 28px;
   box-shadow: 0 12px 35px rgba(15,23,42,0.08);
-  overflow-x: auto;
+  overflow-x: auto;   /* 允許表格左右滑動 */
   overflow-y: visible;
 }
 
@@ -263,7 +263,7 @@ tr:last-child td {
   border-bottom: 0;
 }
 
-/* 員工管理表格專用樣式 */
+/* 員工管理表格專用樣式（自動寬度、不換行、操作欄按鈕水平排列） */
 .employee-table {
   width: max-content;
   min-width: 100%;
@@ -279,19 +279,13 @@ tr:last-child td {
   line-height: 1.45;
 }
 
-/* 狀態欄位置中 */
-.employee-table th:nth-child(8),
-.employee-table td:nth-child(8) {
-  text-align: center;
-}
-
-/* 操作欄位 */
+/* 操作欄（第九欄）強制水平排列按鈕 */
 .employee-table th:nth-child(9),
 .employee-table td:nth-child(9) {
+  min-width: 190px;
   text-align: center;
 }
 
-/* 操作欄按鈕水平排列 */
 .employee-table td:nth-child(9) {
   display: flex;
   gap: 8px;
@@ -301,20 +295,7 @@ tr:last-child td {
 
 .employee-table td:nth-child(9) button {
   margin: 0;
-}
-/* 操作欄位不換行、置中、固定寬度，確保按鈕水平排列 */
-.employee-table th:nth-child(9),
-.employee-table td:nth-child(9) {
-  width: 140px;
-  white-space: nowrap;
-  text-align: center;
-}
-
-/* 操作欄內的按鈕強制水平並排，避免換行 */
-.employee-table td:nth-child(9) button {
-  display: inline-block;
-  margin: 0 4px;
-  vertical-align: middle;
+  min-width: 72px;
 }
 
 @media (max-width: 850px) {
