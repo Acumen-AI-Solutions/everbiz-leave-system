@@ -1056,12 +1056,15 @@ function App() {
   }
 
   // ----- 待審核 -----
-  async function loadPendingApprovals() {
-    const normalizedApproverNo = approverNo.trim().toUpperCase()
-    if (!normalizedApproverNo) {
-      setApprovalMessage(t(lang, '請輸入主管工號', 'Please enter manager employee number', 'Vui lòng nhập mã nhân viên quản lý'))
-      return
-    }
+  useEffect(() => {
+  if (currentUser?.employee_no) {
+    setApproverNo(currentUser.employee_no)
+
+    setTimeout(() => {
+      loadPendingApprovals()
+    }, 300)
+  }
+}, [currentUser])
     setIsLoadingApprovals(true)
     setApprovalMessage(t(lang, '查詢中...', 'Loading...', 'Đang tải...'))
     try {
