@@ -569,3 +569,9 @@ input[readonly] {
   width: auto;
   margin-bottom: 0;
 }
+.nav-btn.danger,
+.nav-btn.active.danger {
+  background-color: #dc3545 !important;
+  color: white !important;
+  animation: pulse 0.8s infinite;
+}
