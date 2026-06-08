@@ -189,6 +189,7 @@ body {
   padding: 28px;
   box-shadow: 0 12px 35px rgba(15,23,42,0.08);
   overflow-x: auto;
+  overflow-y: visible; /* 只允許左右滑，不要上下撐高 */
 }
 
 .card h2 {
@@ -262,49 +263,25 @@ tr:last-child td {
   border-bottom: 0;
 }
 
-/* 員工管理表格專用樣式（固定欄寬、自動換行） */
+/* 員工管理表格專用樣式（自動寬度、不換行、左右滑動） */
 .employee-table {
-  width: 100%;
-  table-layout: fixed;
+  width: max-content;
+  min-width: 100%;
+  table-layout: auto;
 }
 
 .employee-table th,
 .employee-table td {
-  padding: 12px 8px;
+  padding: 12px 14px;
   vertical-align: middle;
-  word-break: break-word;
+  white-space: nowrap;
+  word-break: keep-all;
 }
-
-.employee-table th:nth-child(1),
-.employee-table td:nth-child(1) { width: 10%; }
-
-.employee-table th:nth-child(2),
-.employee-table td:nth-child(2) { width: 10%; }
-
-.employee-table th:nth-child(3),
-.employee-table td:nth-child(3) { width: 12%; }
-
-.employee-table th:nth-child(4),
-.employee-table td:nth-child(4) { width: 8%; }
-
-.employee-table th:nth-child(5),
-.employee-table td:nth-child(5) { width: 18%; }
-
-.employee-table th:nth-child(6),
-.employee-table td:nth-child(6) { width: 14%; }
-
-.employee-table th:nth-child(7),
-.employee-table td:nth-child(7) { width: 14%; }
 
 .employee-table th:nth-child(8),
-.employee-table td:nth-child(8) {
-  width: 6%;
-  text-align: center;
-}
-
+.employee-table td:nth-child(8),
 .employee-table th:nth-child(9),
 .employee-table td:nth-child(9) {
-  width: 8%;
   text-align: center;
 }
 
