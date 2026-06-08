@@ -490,15 +490,29 @@ function App() {
   function editEmployee(emp: FullEmployee) {
     setEditingEmployee(emp)
     setEmployeeFormData({
-      employee_no: emp.employee_no, employee_name: emp.employee_name,
-      department_name: emp.department_name || '', position_title: emp.position_title || '',
-      rank_type: emp.rank_type || '', direct_manager_no: emp.direct_manager_no || '',
+      employee_no: emp.employee_no,
+      employee_name: emp.employee_name,
+      department_name: emp.department_name || '',
+      position_title: emp.position_title || '',
+      rank_type: emp.rank_type || '',
+      direct_manager_no: emp.direct_manager_no || '',
       direct_manager_name: emp.direct_manager_name || '',
-      first_proxy_no: emp.first_proxy_no || '', first_proxy_name: emp.first_proxy_name || '',
-      second_proxy_no: emp.second_proxy_no || '', second_proxy_name: emp.second_proxy_name || '',
-      pin_code: emp.pin_code || '', is_active: emp.is_active
+      first_proxy_no: emp.first_proxy_no || '',
+      first_proxy_name: emp.first_proxy_name || '',
+      second_proxy_no: emp.second_proxy_no || '',
+      second_proxy_name: emp.second_proxy_name || '',
+      pin_code: emp.pin_code || '',
+      is_active: emp.is_active
     })
     setShowEmployeeForm(true)
+
+    // 編輯後自動滾動到員工管理區塊，確保表單可見
+    setTimeout(() => {
+      document.getElementById('employee-section')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      })
+    }, 100)
   }
 
   function newEmployee() {
