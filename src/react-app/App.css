@@ -263,34 +263,45 @@ tr:last-child td {
   border-bottom: 0;
 }
 
-/* 員工管理表格專用樣式（固定欄寬、允許換行，關鍵欄位不換行） */
+/* 員工管理表格專用樣式 */
 .employee-table {
-  width: 100%;
-  table-layout: fixed;
+  width: max-content;
+  min-width: 100%;
+  table-layout: auto;
 }
 
 .employee-table th,
 .employee-table td {
-  padding: 12px 8px;
+  padding: 12px 14px;
   vertical-align: middle;
-  word-break: break-word;
+  white-space: nowrap;
+  word-break: keep-all;
   line-height: 1.45;
 }
 
-/* 姓名欄位不換行 */
-.employee-table th:nth-child(2),
-.employee-table td:nth-child(2) {
-  white-space: nowrap;
-}
-
-/* 狀態欄位不換行、置中、固定寬度 */
+/* 狀態欄位置中 */
 .employee-table th:nth-child(8),
 .employee-table td:nth-child(8) {
-  width: 70px;
-  white-space: nowrap;
   text-align: center;
 }
 
+/* 操作欄位 */
+.employee-table th:nth-child(9),
+.employee-table td:nth-child(9) {
+  text-align: center;
+}
+
+/* 操作欄按鈕水平排列 */
+.employee-table td:nth-child(9) {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  align-items: center;
+}
+
+.employee-table td:nth-child(9) button {
+  margin: 0;
+}
 /* 操作欄位不換行、置中、固定寬度，確保按鈕水平排列 */
 .employee-table th:nth-child(9),
 .employee-table td:nth-child(9) {
