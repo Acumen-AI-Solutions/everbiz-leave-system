@@ -291,12 +291,19 @@ tr:last-child td {
   text-align: center;
 }
 
-/* 操作欄位不換行、置中、固定寬度 */
+/* 操作欄位不換行、置中、固定寬度，確保按鈕水平排列 */
 .employee-table th:nth-child(9),
 .employee-table td:nth-child(9) {
-  width: 110px;
+  width: 140px;
   white-space: nowrap;
   text-align: center;
+}
+
+/* 操作欄內的按鈕強制水平並排，避免換行 */
+.employee-table td:nth-child(9) button {
+  display: inline-block;
+  margin: 0 4px;
+  vertical-align: middle;
 }
 
 @media (max-width: 850px) {
