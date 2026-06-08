@@ -468,6 +468,12 @@ function App() {
     currentUser?.system_role === 'hr' ||
     currentUser?.system_role === 'general_manager'
 
+  // 是否有待審核項目（用於按鈕樣式提醒）
+  const hasPendingApproval =
+    pendingLeaves.length > 0 ||
+    pendingPunches.length > 0 ||
+    pendingOvertimes.length > 0
+
   // ----- 載入假別 -----
   async function loadLeaveTypes() {
     try {
@@ -1507,7 +1513,11 @@ function App() {
               {t(lang, '加班申請', 'Overtime Request', 'Đơn tăng ca')}
             </button>
             {canApprove && (
-              <button type="button" onClick={() => setActiveSection('approvals')}>
+              <button
+                type="button"
+                onClick={() => setActiveSection('approvals')}
+                className={`nav-btn ${activeSection === 'approvals' ? 'active' : ''} ${hasPendingApproval ? 'danger' : ''}`}
+              >
                 {t(lang, '待審核 / 代理審核', 'Pending / Proxy Approval', 'Chờ duyệt / Duyệt thay')}
               </button>
             )}
