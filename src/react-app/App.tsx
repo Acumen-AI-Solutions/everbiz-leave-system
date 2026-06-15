@@ -4,7 +4,7 @@ import './App.css'
 
 const API_BASE = 'https://everbiz-leave-api.imd13.workers.dev'
 
-// ==================== 型別定義 (保持與之前相同) ====================
+// ==================== 型別定義 ====================
 type Employee = {
   employee_no: string
   employee_name: string
@@ -184,7 +184,7 @@ function t(lang: Lang, zh: string, en: string, vi: string): string {
   return zh
 }
 
-// ==================== 時間選項與計算 (保持原有) ====================
+// ==================== 時間選項與計算 ====================
 const timeOptions = [
   '08:00', '08:30', '09:00', '09:30', '10:00', '10:30',
   '11:00', '11:30', '12:00', '12:30', '13:00', '13:30',
@@ -452,14 +452,17 @@ function App() {
   const [hrMessage, setHrMessage] = useState('')
   const [isLoadingHrLeaves, setIsLoadingHrLeaves] = useState(false)
 
-  // 倒資料相關狀態
-  const [importingTxt, setImportingTxt] = useState(false)
+  // 人資倒資料區狀態
   const [importTxtResult, setImportTxtResult] = useState('')
-  const txtFileInputRef = useRef<HTMLInputElement>(null)
-  const overtimeExcelFileInputRef = useRef<HTMLInputElement>(null)
-  const cardExcelFileInputRef = useRef<HTMLInputElement>(null)
+  const [importOvertimeResult, setImportOvertimeResult] = useState('')
   const [importCardResult, setImportCardResult] = useState('')
+  const [importingTxt, setImportingTxt] = useState(false)
+  const [importingOvertimeHr, setImportingOvertimeHr] = useState(false)
   const [importingCards, setImportingCards] = useState(false)
+
+  const txtFileInputRef = useRef<HTMLInputElement>(null)
+  const overtimeHrFileInputRef = useRef<HTMLInputElement>(null)
+  const cardFileInputRef = useRef<HTMLInputElement>(null)
 
   const canApprove = !!currentUser
   const canViewHrReport =
@@ -722,8 +725,10 @@ function App() {
     setEmployeeList([])
     resetEmployeeForm()
     setImportTxtResult('')
+    setImportOvertimeResult('')
     setImportCardResult('')
     setOvertimeImportMessage('')
+    setOvertimeImportRows([])
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -861,7 +866,7 @@ function App() {
     }
   }
 
-  // 加班 Excel 匯入相關函數（已在下面實作，此處保留原本的）
+  // 加班 Excel 匯入（在申請區使用）
   function handleOvertimeExcelUpload(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     if (!file) return
@@ -974,7 +979,7 @@ function App() {
     }
   }
 
-  // 門禁 TXT 匯入
+  // 人資倒資料區：門禁 TXT 匯入
   async function handleTxtImport(file: File) {
     if (!currentUser) return
     setImportingTxt(true)
@@ -994,7 +999,6 @@ function App() {
       } else {
         setImportTxtResult(`成功 ${data.inserted} 筆，錯誤 ${data.errors?.length || 0} 筆${data.errors?.length ? '，詳情請看控制台' : ''}`)
         if (data.errors && data.errors.length) console.warn(data.errors)
-        // 重新載入出勤日報（如果需要）
         if (activeRecordTab === 'attendance') await loadAttendance()
       }
     } catch (err) {
@@ -1002,27 +1006,81 @@ function App() {
       setImportTxtResult('匯入過程中發生錯誤，請確認檔案格式')
     } finally {
       setImportingTxt(false)
+      if (txtFileInputRef.current) txtFileInputRef.current.value = ''
     }
   }
 
-  // 員工卡號批量匯入 (CSV/Excel)
+  // 人資倒資料區：加班 Excel 獨立匯入（不使用原本的 overtimeImportRows 狀態，避免干擾）
+  async function handleOvertimeHrImport(file: File) {
+    if (!currentUser) return
+    setImportingOvertimeHr(true)
+    setImportOvertimeResult('')
+    try {
+      // 解析 Excel
+      const data = await file.arrayBuffer()
+      const workbook = XLSX.read(data)
+      const sheetName = workbook.SheetNames[0]
+      const worksheet = workbook.Sheets[sheetName]
+      const jsonRows = XLSX.utils.sheet_to_json(worksheet) as any[]
+      if (jsonRows.length === 0) {
+        setImportOvertimeResult('檔案中沒有資料')
+        return
+      }
+      // 轉換為 API 所需的格式
+      const rows = jsonRows.map(row => ({
+        employee_no: (row['員工編號'] || row['employee_no'] || '').toString().trim(),
+        employee_name: (row['員工姓名'] || row['employee_name'] || '').toString().trim(),
+        department_name: (row['部門名稱'] || row['department_name'] || '').toString().trim(),
+        overtime_date: normalizeExcelDate(row['起始日期'] || row['overtime_date']),
+        start_time: normalizeExcelTime(row['起始時間'] || row['start_time']),
+        end_time: normalizeExcelTime(row['結束時間'] || row['end_time']),
+        reason: (row['加班原因'] || row['reason'] || '').toString().trim(),
+        overtime_shift: (row['加班班別'] || row['overtime_shift'] || '').toString().trim(),
+        cost_department: (row['費用歸屬部門'] || row['cost_department'] || '').toString().trim(),
+        customer: (row['工單客戶'] || row['customer'] || '').toString().trim(),
+        work_order_no: (row['工單號碼'] || row['work_order_no'] || '').toString().trim(),
+        quantity: (row['數量'] || row['quantity'] || '').toString().trim(),
+        due_date: normalizeExcelDate(row['交期'] || row['due_date']),
+        description: (row['加班內容說明'] || row['description'] || '').toString().trim(),
+        pay_type: (row['給付方式'] || row['pay_type'] || '').toString().trim(),
+      }))
+
+      const res = await fetch(`${API_BASE}/api/overtime/import`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ importer_no: currentUser.employee_no, rows })
+      })
+      const result = await res.json()
+      if (!result.ok) {
+        setImportOvertimeResult(result.message || '匯入失敗')
+      } else {
+        setImportOvertimeResult(`成功 ${result.inserted} 筆，錯誤 ${result.errors?.length || 0} 筆${result.errors?.length ? '，詳情請看控制台' : ''}`)
+        if (result.errors?.length) console.warn(result.errors)
+      }
+    } catch (err) {
+      console.error(err)
+      setImportOvertimeResult('匯入失敗，請檢查檔案格式')
+    } finally {
+      setImportingOvertimeHr(false)
+      if (overtimeHrFileInputRef.current) overtimeHrFileInputRef.current.value = ''
+    }
+  }
+
+  // 人資倒資料區：員工卡號匯入（CSV/Excel）
   async function handleCardImport(file: File) {
     if (!currentUser) return
     setImportingCards(true)
     setImportCardResult('')
     try {
-      // 解析 Excel 或 CSV
-      const fileExt = file.name.split('.').pop()?.toLowerCase()
       let rows: any[] = []
+      const fileExt = file.name.split('.').pop()?.toLowerCase()
       if (fileExt === 'xlsx' || fileExt === 'xls') {
         const data = await file.arrayBuffer()
         const workbook = XLSX.read(data)
         const sheetName = workbook.SheetNames[0]
         const worksheet = workbook.Sheets[sheetName]
-        const jsonRows = XLSX.utils.sheet_to_json(worksheet)
-        rows = jsonRows
+        rows = XLSX.utils.sheet_to_json(worksheet)
       } else {
-        // 假設是 CSV
         const text = await file.text()
         const lines = text.split(/\r?\n/).filter(l => l.trim())
         const headers = lines[0].split(',').map(h => h.trim())
@@ -1040,7 +1098,6 @@ function App() {
         return
       }
 
-      // 預期欄位: employee_no, card_no (也可包含 employee_name 用於驗證)
       let successCount = 0
       let failCount = 0
       const errors: string[] = []
@@ -1054,7 +1111,7 @@ function App() {
           failCount++
           continue
         }
-        // 獲取該員工現有資料
+        // 先查詢員工現有資料
         const empRes = await fetch(`${API_BASE}/api/hr/employees?hr_no=${encodeURIComponent(currentUser.employee_no)}`)
         const empData = await empRes.json()
         const existingEmp = empData.employees?.find((e: any) => e.employee_no === employeeNo)
@@ -1063,7 +1120,6 @@ function App() {
           failCount++
           continue
         }
-        // 僅更新卡號，保留其他欄位
         const payload = {
           hr_no: currentUser.employee_no,
           employee_no: existingEmp.employee_no,
@@ -1096,13 +1152,13 @@ function App() {
       }
       setImportCardResult(`匯入完成：成功 ${successCount} 筆，失敗 ${failCount} 筆${errors.length ? `，錯誤詳情請看控制台` : ''}`)
       if (errors.length) console.warn(errors)
-      // 重新加載員工列表
       await loadHrEmployees()
     } catch (err) {
       console.error(err)
       setImportCardResult('匯入過程中發生錯誤，請檢查檔案格式')
     } finally {
       setImportingCards(false)
+      if (cardFileInputRef.current) cardFileInputRef.current.value = ''
     }
   }
 
@@ -2275,4 +2331,142 @@ function App() {
                 </div>
                 {hrMessage && <div className="note-box">{hrMessage}</div>}
                 {hrLeaves.length === 0 && hrPunches.length === 0 && hrOvertimes.length === 0 ? (
-                  <p className="small">{t(lang, '目前沒有 HR 報表資料。', 'No HR report records found.', 'Không có dữ liệu báo
+                  <p className="small">{t(lang, '目前沒有 HR 報表資料。', 'No HR report records found.', 'Không có dữ liệu báo cáo HR.')}</p>
+                ) : (
+                  <>
+                    {hrLeaves.length > 0 && (
+                      <>
+                        <h3>{t(lang, '請假報表', 'Leave Report', 'Báo cáo nghỉ phép')}</h3>
+                        <div className="approval-list">
+                          {hrLeaves.map(leave => (
+                            <div className="approval-item" key={`hr-leave-${leave.id}`}>
+                              <div>
+                                <strong>#{leave.id}｜{leave.employee_no} {leave.employee_name}｜{statusText(leave.status, lang)}</strong>
+                                <p>{getLeaveTypeDisplayName(leave.leave_type)}｜{leave.start_date} {leave.start_time || ''} ~ {leave.end_date} {leave.end_time || ''}</p>
+                                <p>{t(lang, '時數', 'Hours', 'Số giờ')}：{leave.total_hours ?? '-'} {t(lang, '小時', 'hr(s)', 'giờ')}</p>
+                                <p>{t(lang, '原因', 'Reason', 'Lý do')}：{leave.reason || t(lang, '未填寫', 'N/A', 'Chưa điền')}</p>
+                                <p>{t(lang, '審核主管', 'Approver', 'Người duyệt')}：{approverDisplay(leave.current_approver_no, leave.current_approver_name)}</p>
+                                <p>{t(lang, '建立時間', 'Created At', 'Thời gian tạo')}：{leave.created_at}</p>
+                                {leave.status === 'voided' && <><p>{t(lang, '作廢人員', 'Voided By', 'Người hủy')}：{leave.voided_by_name || '-'}</p><p>{t(lang, '作廢原因', 'Void Reason', 'Lý do hủy')}：{leave.void_reason || '-'}</p></>}
+                                {leave.status === 'cancelled' && <><p>{t(lang, '取消人員', 'Cancelled By', 'Người hủy bỏ')}：{leave.cancelled_by_name || '-'}</p><p>{t(lang, '取消原因', 'Cancel Reason', 'Lý do hủy bỏ')}：{leave.cancel_reason || '-'}</p><p>{t(lang, '取消時間', 'Cancelled At', 'Thời gian hủy bỏ')}：{leave.cancelled_at || '-'}</p></>}
+                              </div>
+                              {leave.status !== 'voided' && <div className="approval-actions"><button className="reject-btn" onClick={() => handleVoidLeave(leave.id)}>{t(lang, '作廢', 'Void', 'Hủy')}</button></div>}
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                    {hrPunches.length > 0 && (
+                      <>
+                        <h3>{t(lang, '補卡 / 忘刷報表', 'Punch Correction Report', 'Báo cáo bổ sung chấm công')}</h3>
+                        <div className="approval-list">
+                          {hrPunches.map(punch => (
+                            <div className="approval-item" key={`hr-punch-${punch.id}`}>
+                              <div>
+                                <strong>#{punch.id}｜{punch.employee_no} {punch.employee_name}｜{statusText(punch.status, lang)}</strong>
+                                <p>{punch.punch_type}｜{punch.punch_date} {punch.punch_time}</p>
+                                <p>{t(lang, '原因', 'Reason', 'Lý do')}：{punch.reason || t(lang, '未填寫', 'N/A', 'Chưa điền')}</p>
+                                <p>{t(lang, '審核主管', 'Approver', 'Người duyệt')}：{approverDisplay(punch.current_approver_no, punch.current_approver_name)}</p>
+                                <p>{t(lang, '建立時間', 'Created At', 'Thời gian tạo')}：{punch.created_at}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                    {hrOvertimes.length > 0 && (
+                      <>
+                        <h3>{t(lang, '加班報表', 'Overtime Report', 'Báo cáo tăng ca')}</h3>
+                        <div className="approval-list">
+                          {hrOvertimes.map(ot => (
+                            <div className="approval-item" key={`hr-ot-${ot.id}`}>
+                              <div>
+                                <strong>#{ot.id}｜{ot.employee_no} {ot.employee_name}｜{statusText(ot.status, lang)}</strong>
+                                <p>{ot.overtime_type}｜{ot.overtime_date} {ot.start_time}~{ot.end_time}</p>
+                                <p>{t(lang, '時數', 'Hours', 'Số giờ')}：{ot.total_hours ?? '-'} {t(lang, '小時', 'hr(s)', 'giờ')}</p>
+                                <p>{t(lang, '原因', 'Reason', 'Lý do')}：{ot.reason || t(lang, '未填寫', 'N/A', 'Chưa điền')}</p>
+                                <p>{t(lang, '審核主管', 'Approver', 'Người duyệt')}：{approverDisplay(ot.current_approver_no, ot.current_approver_name)}</p>
+                                <p>{t(lang, '建立時間', 'Created At', 'Thời gian tạo')}：{ot.created_at}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </>
+                )}
+              </section>
+
+              <section id="hr-import-section" className="card result-card">
+                <h2>{t(lang, '人資倒資料區', 'HR Data Import', 'Nhập dữ liệu nhân sự')}</h2>
+                <div className="approval-search">
+                  {/* 1. 門禁 TXT 匯入 */}
+                  <button
+                    className="submit-btn"
+                    onClick={() => txtFileInputRef.current?.click()}
+                    disabled={importingTxt}
+                  >
+                    {importingTxt ? t(lang, '匯入中...', 'Importing...', 'Đang nhập...') : t(lang, '匯入門禁 TXT', 'Import Access TXT', 'Nhập TXT cửa')}
+                  </button>
+                  <input
+                    ref={txtFileInputRef}
+                    type="file"
+                    accept=".txt"
+                    style={{ display: 'none' }}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) handleTxtImport(file)
+                    }}
+                  />
+
+                  {/* 2. 加班 Excel 匯入（獨立） */}
+                  <button
+                    className="submit-btn"
+                    onClick={() => overtimeHrFileInputRef.current?.click()}
+                    disabled={importingOvertimeHr}
+                  >
+                    {importingOvertimeHr ? t(lang, '匯入中...', 'Importing...', 'Đang nhập...') : t(lang, '匯入加班 Excel', 'Import Overtime Excel', 'Nhập Excel tăng ca')}
+                  </button>
+                  <input
+                    ref={overtimeHrFileInputRef}
+                    type="file"
+                    accept=".xlsx, .xls, .csv"
+                    style={{ display: 'none' }}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) handleOvertimeHrImport(file)
+                    }}
+                  />
+
+                  {/* 3. 員工卡號匯入 */}
+                  <button
+                    className="submit-btn"
+                    onClick={() => cardFileInputRef.current?.click()}
+                    disabled={importingCards}
+                  >
+                    {importingCards ? t(lang, '匯入中...', 'Importing...', 'Đang nhập...') : t(lang, '匯入員工卡號', 'Import Employee Card No.', 'Nhập mã thẻ nhân viên')}
+                  </button>
+                  <input
+                    ref={cardFileInputRef}
+                    type="file"
+                    accept=".xlsx, .xls, .csv"
+                    style={{ display: 'none' }}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) handleCardImport(file)
+                    }}
+                  />
+                </div>
+                {importTxtResult && <div className="note-box">{importTxtResult}</div>}
+                {importOvertimeResult && <div className="note-box">{importOvertimeResult}</div>}
+                {importCardResult && <div className="note-box">{importCardResult}</div>}
+              </section>
+            </>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+export default App
