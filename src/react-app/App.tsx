@@ -632,7 +632,7 @@ function App() {
       const res = await fetch(`${API_BASE}/api/employees`)
       const data = await res.json()
       if (data.ok) {
-        let allEmployees = data.employees || []
+        let allEmployees: Employee[] = data.employees || []
         if (!currentUser) {
           setEmployeeList([])
           return
