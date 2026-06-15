@@ -595,3 +595,9 @@ input[readonly] {
   width: auto;
   margin-bottom: 0;
 }
+
+/* 異常狀態紅色文字（用於出勤紀錄表格） */
+.danger-text {
+  color: #dc2626;
+  font-weight: 700;
+}
