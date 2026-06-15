@@ -2052,7 +2052,7 @@ function App() {
 
                       <div style={{ marginTop: '24px', borderTop: '1px solid #ddd', paddingTop: '16px' }}>
                         <h3>{t(lang, '批次匯入加班 (Excel)', 'Batch Import Overtime (Excel)', 'Nhập hàng loạt tăng ca (Excel)')}</h3>
-                        <input type="file" accept=".xlsx, .xls, .csv" onChange={handleOvertimeExcelUpload} />
+                        <input type="file" accept=".xlsx, .xls, .csv, .txt" onChange={handleOvertimeExcelUpload} />
                         <div className="note-box" style={{ marginTop: '8px' }}>
                           {t(lang,
                             `已載入 ${overtimeImportRows.length} 筆資料`,
@@ -2459,7 +2459,7 @@ function App() {
                   <input
                     ref={overtimeHrFileInputRef}
                     type="file"
-                    accept=".xlsx, .xls, .csv"
+                    accept=".xlsx, .xls, .csv, .txt"
                     style={{ display: 'none' }}
                     onChange={(e) => {
                       const file = e.target.files?.[0]
@@ -2478,7 +2478,7 @@ function App() {
                   <input
                     ref={cardFileInputRef}
                     type="file"
-                    accept=".xlsx, .xls, .csv"
+                    accept=".xlsx, .xls, .csv, .txt"
                     style={{ display: 'none' }}
                     onChange={(e) => {
                       const file = e.target.files?.[0]
