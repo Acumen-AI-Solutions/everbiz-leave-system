@@ -31,7 +31,7 @@ function getTaiwanTimeString() {
   return taiwanTime.toISOString().replace('T', ' ').slice(0, 19)
 }
 
-// ----- 新增輔助函式（用於加班自動計算）-----
+// ----- 輔助函式（用於加班自動計算）-----
 function timeToMinutesForWorker(time) {
   const parts = String(time || '').split(':')
   if (parts.length !== 2) return 0
@@ -986,20 +986,180 @@ async function handleRequest(request, env) {
     })
   }
 
-  // ----- 除錯路由 -----
+  // ----- 除錯路由（增強版）-----
   if (method === 'GET' && path === '/api/debug/db') {
     try {
       const countStmt = await env.DB.prepare('SELECT COUNT(*) as count FROM employees').first()
       const leaveCountStmt = await env.DB.prepare('SELECT COUNT(*) as count FROM leave_requests').first()
+      const attendanceCountStmt = await env.DB.prepare('SELECT COUNT(*) as count FROM attendance_daily').first()
+
       return jsonResponse({
         ok: true,
         employees: countStmt?.count || 0,
         leave_requests: leaveCountStmt?.count || 0,
+        attendance_daily: attendanceCountStmt?.count || 0,
         message: '資料庫連線正常'
       })
     } catch (err) {
       return jsonResponse({ ok: false, error: err.message }, 500)
     }
+  }
+
+  // ----- TXT刷卡匯入 -----
+  if (method === 'POST' && path === '/api/attendance/import-txt') {
+    const body = await request.json()
+    const lines = Array.isArray(body.lines) ? body.lines : []
+
+    if (lines.length === 0) {
+      return jsonResponse({ ok: false, message: '沒有刷卡資料' }, 400)
+    }
+
+    let inserted = 0
+    const errors = []
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = String(lines[i] || '').trim()
+      if (!line) continue
+
+      const parts = line.split(',')
+      if (parts.length < 5) {
+        errors.push(`第 ${i + 1} 行格式錯誤`)
+        continue
+      }
+
+      const cardNo = `${parts[0]},${parts[1]}`
+      const deviceNo = parts[2]
+      const punchDate = parts[3].replaceAll('/', '-')
+      const punchTime = parts[4]
+      const rawDatetime = `${punchDate} ${punchTime}`
+
+      const card = await env.DB.prepare(`
+        SELECT
+          ec.employee_no,
+          e.employee_name
+        FROM employee_cards ec
+        LEFT JOIN employees e
+          ON ec.employee_no = e.employee_no
+        WHERE ec.card_no = ?
+          AND ec.is_active = 1
+      `).bind(cardNo).first()
+
+      if (!card) {
+        errors.push(`第 ${i + 1} 行找不到卡號：${cardNo}`)
+        continue
+      }
+
+      await env.DB.prepare(`
+        INSERT INTO attendance_logs (
+          card_no,
+          employee_no,
+          employee_name,
+          punch_date,
+          punch_time,
+          raw_datetime,
+          source_type,
+          created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, 'txt_rpa', ?)
+      `).bind(
+        cardNo,
+        card.employee_no,
+        card.employee_name || '',
+        punchDate,
+        punchTime,
+        rawDatetime,
+        getTaiwanTimeString()
+      ).run()
+
+      inserted++
+    }
+
+    // 匯入後自動重算每日出勤
+    await env.DB.prepare(`
+      DELETE FROM attendance_daily
+      WHERE work_date IN (
+        SELECT DISTINCT punch_date FROM attendance_logs
+      )
+    `).run()
+
+    await env.DB.prepare(`
+      INSERT INTO attendance_daily (
+        employee_no,
+        employee_name,
+        work_date,
+        first_punch_time,
+        last_punch_time,
+        status_note,
+        updated_at
+      )
+      SELECT
+        employee_no,
+        employee_name,
+        punch_date,
+        MIN(punch_time),
+        MAX(punch_time),
+        'RPA TXT自動彙總',
+        ?
+      FROM attendance_logs
+      GROUP BY employee_no, employee_name, punch_date
+    `).bind(getTaiwanTimeString()).run()
+
+    return jsonResponse({
+      ok: true,
+      message: `匯入完成，成功 ${inserted} 筆，錯誤 ${errors.length} 筆`,
+      inserted,
+      errors
+    })
+  }
+
+  // ----- 出勤日報 -----
+  if (method === 'GET' && path === '/api/attendance/daily') {
+    const date = url.searchParams.get('date')
+
+    let result
+
+    if (date) {
+      result = await env.DB.prepare(`
+        SELECT *
+        FROM attendance_daily
+        WHERE work_date = ?
+        ORDER BY employee_no ASC
+      `).bind(date).all()
+    } else {
+      result = await env.DB.prepare(`
+        SELECT *
+        FROM attendance_daily
+        ORDER BY work_date DESC, employee_no ASC
+        LIMIT 100
+      `).all()
+    }
+
+    return jsonResponse({
+      ok: true,
+      attendance: result.results || []
+    })
+  }
+
+  // ----- 我的出勤 -----
+  if (method === 'GET' && path === '/api/attendance/my') {
+    const employeeNo = url.searchParams.get('employee_no')
+
+    if (!employeeNo) {
+      return jsonResponse({ ok: false, message: '缺少 employee_no' }, 400)
+    }
+
+    const result = await env.DB.prepare(`
+      SELECT *
+      FROM attendance_daily
+      WHERE employee_no = ?
+      ORDER BY work_date DESC
+      LIMIT 100
+    `).bind(employeeNo.trim().toUpperCase()).all()
+
+    return jsonResponse({
+      ok: true,
+      attendance: result.results || []
+    })
   }
 
   if (method === 'GET' && path === '/') {
