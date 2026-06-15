@@ -632,7 +632,7 @@ function App() {
       const res = await fetch(`${API_BASE}/api/employees`)
       const data = await res.json()
       if (data.ok) {
-        let allEmployees: Employee[] = data.employees || []
+        const allEmployees = (data.employees || []) as Employee[]
         if (!currentUser) {
           setEmployeeList([])
           return
@@ -643,11 +643,11 @@ function App() {
           setEmployeeList(allEmployees)
         } else if (role === 'manager') {
           // 主管：只看直屬下屬
-          const filtered = allEmployees.filter(emp => emp.direct_manager_no === currentUser.employee_no)
+          const filtered = allEmployees.filter((emp: Employee) => emp.direct_manager_no === currentUser.employee_no)
           setEmployeeList(filtered)
         } else {
           // 一般員工：只看自己
-          const filtered = allEmployees.filter(emp => emp.employee_no === currentUser.employee_no)
+          const filtered = allEmployees.filter((emp: Employee) => emp.employee_no === currentUser.employee_no)
           setEmployeeList(filtered)
         }
       }
@@ -1030,7 +1030,7 @@ function App() {
     }
   }
 
-  // 人資倒資料區：加班 Excel 獨立匯入（不使用原本的 overtimeImportRows 狀態，避免干擾）
+  // 人資倒資料區：加班 Excel 獨立匯入
   async function handleOvertimeHrImport(file: File) {
     if (!currentUser) return
     setImportingOvertimeHr(true)
@@ -2243,7 +2243,6 @@ function App() {
                                   {row.punch_fix_status || 'normal'}
                                 </td>
                                 <td style={{ border: '1px solid #ddd', padding: '8px' }}>
-                                  {/* 只要有異常（非 normal）就顯示「填寫異常原因」按鈕 */}
                                   {row.punch_fix_status && row.punch_fix_status !== 'normal' && (
                                     <button
                                       className="btn-danger"
