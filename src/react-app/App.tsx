@@ -105,7 +105,6 @@ type PunchRecord = {
   updated_at: string
 }
 
-// 完整 OvertimeRecord，含 RPA 匯出欄位
 type OvertimeRecord = {
   id: number
   employee_no: string
@@ -130,6 +129,20 @@ type OvertimeRecord = {
   due_date?: string
   description?: string
   pay_type?: string
+}
+
+type AttendanceRecord = {
+  id: number
+  employee_no: string
+  employee_name: string
+  work_date: string
+  first_punch_time: string
+  last_punch_time: string
+  leave_hours: number
+  overtime_hours: number
+  punch_fix_status: string | null
+  status_note: string | null
+  updated_at: string
 }
 
 type OvertimeImportRow = {
@@ -160,7 +173,7 @@ type LeaveTypeOption = {
 
 type FormType = 'leave' | 'punch' | 'overtime'
 type SectionType = 'form' | 'approvals' | 'hr' | 'employees'
-type RecordTab = 'leave' | 'punch' | 'overtime'
+type RecordTab = 'leave' | 'punch' | 'overtime' | 'attendance'
 type Lang = 'zh' | 'en' | 'vi'
 
 // ==================== 多語系輔助 ====================
@@ -428,6 +441,11 @@ function App() {
   const [myOvertimeMessage, setMyOvertimeMessage] = useState('')
   const [isLoadingMyOvertimes, setIsLoadingMyOvertimes] = useState(false)
 
+  // 出勤紀錄狀態
+  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([])
+  const [attendanceMessage, setAttendanceMessage] = useState('')
+  const [isLoadingAttendance, setIsLoadingAttendance] = useState(false)
+
   const [hrLeaves, setHrLeaves] = useState<LeaveRecord[]>([])
   const [hrPunches, setHrPunches] = useState<PunchRecord[]>([])
   const [hrOvertimes, setHrOvertimes] = useState<OvertimeRecord[]>([])
@@ -682,6 +700,7 @@ function App() {
     setMyLeaves([])
     setMyPunches([])
     setMyOvertimes([])
+    setAttendanceRecords([])
     setHrLeaves([])
     setHrPunches([])
     setHrOvertimes([])
@@ -690,6 +709,7 @@ function App() {
     setMyLeaveMessage('')
     setMyPunchMessage('')
     setMyOvertimeMessage('')
+    setAttendanceMessage('')
     setHrMessage('')
     setHrEmployeeMessage('')
     setResult(null)
@@ -1175,6 +1195,29 @@ function App() {
     }
   }
 
+  // ----- 出勤紀錄 (Attendance) -----
+  async function loadAttendance() {
+    if (!currentUser) return
+    setIsLoadingAttendance(true)
+    setAttendanceMessage(t(lang, '查詢中...', 'Loading...', 'Đang tải...'))
+    try {
+      const res = await fetch(`${API_BASE}/api/attendance/daily?employee_no=${encodeURIComponent(currentUser.employee_no)}`)
+      const data = await res.json()
+      if (!data.ok) {
+        setAttendanceMessage(data.message || t(lang, '查詢出勤紀錄失敗', 'Failed to load attendance records', 'Tải chấm công thất bại'))
+        setAttendanceRecords([])
+        return
+      }
+      setAttendanceRecords(data.attendance || [])
+      setAttendanceMessage(t(lang, `已載入 ${data.attendance?.length || 0} 筆出勤紀錄`, `Loaded ${data.attendance?.length || 0} attendance records`, `Đã tải ${data.attendance?.length || 0} bản ghi chấm công`))
+    } catch {
+      setAttendanceMessage(t(lang, '查詢失敗，請確認 API 是否正常', 'Query failed. Please check the API.', 'Truy vấn thất bại. Vui lòng kiểm tra API.'))
+      setAttendanceRecords([])
+    } finally {
+      setIsLoadingAttendance(false)
+    }
+  }
+
   async function handleCancelLeave(leaveId: number) {
     if (!currentUser) return
     const cancelReason = window.prompt(t(lang, '請輸入取消原因', 'Please enter cancellation reason', 'Vui lòng nhập lý do hủy đơn'))
@@ -1400,7 +1443,6 @@ function App() {
     setHrMessage(t(lang, `已匯出 ${punchData.length} 筆補卡 / 忘刷報表`, `Exported ${punchData.length} punch record(s)`, `Đã xuất ${punchData.length} bản ghi`))
   }
 
-  // ★ 加班匯出符合 RPA 欄位順序（共 17 欄）
   async function exportHrOvertimesCsv() {
     let overtimeData = hrOvertimes
 
@@ -1877,6 +1919,7 @@ function App() {
                   <button className={activeRecordTab === 'leave' ? 'active' : ''} onClick={() => setActiveRecordTab('leave')}>{t(lang, '請假紀錄', 'Leave Records', 'Lịch sử nghỉ phép')}</button>
                   <button className={activeRecordTab === 'punch' ? 'active' : ''} onClick={() => setActiveRecordTab('punch')}>{t(lang, '補卡紀錄', 'Punch Records', 'Lịch sử chấm công')}</button>
                   <button className={activeRecordTab === 'overtime' ? 'active' : ''} onClick={() => setActiveRecordTab('overtime')}>{t(lang, '加班紀錄', 'Overtime Records', 'Lịch sử tăng ca')}</button>
+                  <button className={activeRecordTab === 'attendance' ? 'active' : ''} onClick={() => { setActiveRecordTab('attendance'); loadAttendance(); }}>{t(lang, '出勤紀錄', 'Attendance', 'Chấm công')}</button>
                 </div>
 
                 {activeRecordTab === 'leave' && (
@@ -1954,6 +1997,45 @@ function App() {
                             </div>
                           </div>
                         ))}
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {activeRecordTab === 'attendance' && (
+                  <>
+                    <button className="submit-btn" onClick={loadAttendance} disabled={isLoadingAttendance}>
+                      {isLoadingAttendance ? t(lang, '查詢中...', 'Loading...', 'Đang tải...') : t(lang, '查詢出勤紀錄', 'Load Attendance', 'Tải chấm công')}
+                    </button>
+                    {attendanceMessage && <div className="note-box">{attendanceMessage}</div>}
+                    {attendanceRecords.length === 0 ? (
+                      <p className="small">{t(lang, '目前沒有出勤紀錄。', 'No attendance records.', 'Không có bản ghi chấm công.')}</p>
+                    ) : (
+                      <div style={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                          <thead>
+                            <tr>
+                              <th style={{ border: '1px solid #ddd', padding: '8px' }}>{t(lang, '日期', 'Date', 'Ngày')}</th>
+                              <th style={{ border: '1px solid #ddd', padding: '8px' }}>{t(lang, '上班', 'Clock-in', 'Giờ vào')}</th>
+                              <th style={{ border: '1px solid #ddd', padding: '8px' }}>{t(lang, '下班', 'Clock-out', 'Giờ ra')}</th>
+                              <th style={{ border: '1px solid #ddd', padding: '8px' }}>{t(lang, '請假時數', 'Leave Hours', 'Giờ nghỉ')}</th>
+                              <th style={{ border: '1px solid #ddd', padding: '8px' }}>{t(lang, '加班時數', 'OT Hours', 'Giờ tăng ca')}</th>
+                              <th style={{ border: '1px solid #ddd', padding: '8px' }}>{t(lang, '狀態', 'Status', 'Trạng thái')}</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {attendanceRecords.map(row => (
+                              <tr key={row.id}>
+                                <td style={{ border: '1px solid #ddd', padding: '8px' }}>{row.work_date}</td>
+                                <td style={{ border: '1px solid #ddd', padding: '8px' }}>{row.first_punch_time || '-'}</td>
+                                <td style={{ border: '1px solid #ddd', padding: '8px' }}>{row.last_punch_time || '-'}</td>
+                                <td style={{ border: '1px solid #ddd', padding: '8px' }}>{row.leave_hours ?? '-'}</td>
+                                <td style={{ border: '1px solid #ddd', padding: '8px' }}>{row.overtime_hours ?? '-'}</td>
+                                <td style={{ border: '1px solid #ddd', padding: '8px' }}>{row.status_note || '-'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
                     )}
                   </>
