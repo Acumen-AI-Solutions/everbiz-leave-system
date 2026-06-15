@@ -146,6 +146,15 @@ type AttendanceRecord = {
   updated_at: string
 }
 
+type AttendanceException = {
+  employee_no: string
+  employee_name: string
+  work_date: string
+  exception_type: string
+  reason_text: string | null
+  status: string
+}
+
 type OvertimeImportRow = {
   employee_no: string
   employee_name: string
@@ -452,6 +461,10 @@ function App() {
   const [hrMessage, setHrMessage] = useState('')
   const [isLoadingHrLeaves, setIsLoadingHrLeaves] = useState(false)
 
+  // 出勤異常報表狀態
+  const [attendanceExceptions, setAttendanceExceptions] = useState<AttendanceException[]>([])
+  const [loadingExceptions, setLoadingExceptions] = useState(false)
+
   // 人資倒資料區狀態
   const [importTxtResult, setImportTxtResult] = useState('')
   const [importOvertimeResult, setImportOvertimeResult] = useState('')
@@ -726,6 +739,7 @@ function App() {
     setMyPunches([])
     setMyOvertimes([])
     setAttendanceRecords([])
+    setAttendanceExceptions([])
     setHrLeaves([])
     setHrPunches([])
     setHrOvertimes([])
@@ -1099,25 +1113,25 @@ function App() {
         const worksheet = workbook.Sheets[sheetName]
         rows = XLSX.utils.sheet_to_json(worksheet)
       } else {
-          const text = await file.text()
-          const lines = text.split(/\r?\n/).filter(l => l.trim())
-          if (fileExt === 'txt') {
-            rows = lines.map(line => {
-              const parts = line.split(',')
-              if (parts.length < 3) return null
-              return { employee_no: parts[0].trim(), card_no: `${parts[1].trim()},${parts[2].trim()}` }
-            }).filter(Boolean) as any[]
-          } else {
-            const headers = lines[0].split(',').map(h => h.trim())
-            const dataRows = lines.slice(1).map(line => {
-              const values = line.split(',')
-              const obj: any = {}
-              headers.forEach((h, idx) => { obj[h] = values[idx]?.trim() })
-              return obj
-            })
-            rows = dataRows
-          }
+        const text = await file.text()
+        const lines = text.split(/\r?\n/).filter(l => l.trim())
+        if (fileExt === 'txt') {
+          rows = lines.map(line => {
+            const parts = line.split(',')
+            if (parts.length < 3) return null
+            return { employee_no: parts[0].trim(), card_no: `${parts[1].trim()},${parts[2].trim()}` }
+          }).filter(Boolean) as any[]
+        } else {
+          const headers = lines[0].split(',').map(h => h.trim())
+          const dataRows = lines.slice(1).map(line => {
+            const values = line.split(',')
+            const obj: any = {}
+            headers.forEach((h, idx) => { obj[h] = values[idx]?.trim() })
+            return obj
+          })
+          rows = dataRows
         }
+      }
 
       if (rows.length === 0) {
         setImportCardResult('沒有找到資料')
@@ -1430,6 +1444,26 @@ function App() {
     }
   }
 
+  // 載入出勤異常報表
+  async function loadAttendanceExceptions() {
+    if (!currentUser) return
+    setLoadingExceptions(true)
+    try {
+      const res = await fetch(`${API_BASE}/api/attendance/exceptions?viewer_no=${encodeURIComponent(currentUser.employee_no)}`)
+      const data = await res.json()
+      if (data.ok) {
+        setAttendanceExceptions(data.exceptions || [])
+      } else {
+        setAttendanceExceptions([])
+      }
+    } catch (err) {
+      console.error(err)
+      setAttendanceExceptions([])
+    } finally {
+      setLoadingExceptions(false)
+    }
+  }
+
   async function loadAttendance() {
     if (!currentUser) return
     setIsLoadingAttendance(true)
@@ -1443,6 +1477,8 @@ function App() {
         return
       }
       setAttendanceRecords(data.attendance || [])
+      // 自動載入異常報表
+      await loadAttendanceExceptions()
       setAttendanceMessage(t(lang, `已載入 ${data.attendance?.length || 0} 筆出勤紀錄`, `Loaded ${data.attendance?.length || 0} attendance records`, `Đã tải ${data.attendance?.length || 0} bản ghi chấm công`))
     } catch {
       setAttendanceMessage(t(lang, '查詢失敗，請確認 API 是否正常', 'Query failed. Please check the API.', 'Truy vấn thất bại. Vui lòng kiểm tra API.'))
@@ -2260,6 +2296,41 @@ function App() {
                                     </button>
                                   )}
                                 </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    {/* 出勤異常報表表格 */}
+                    <h3 style={{ marginTop: '24px' }}>{t(lang, '出勤異常報表', 'Attendance Exception Report', 'Báo cáo chấm công bất thường')}</h3>
+                    {loadingExceptions ? (
+                      <p>{t(lang, '載入中...', 'Loading...', 'Đang tải...')}</p>
+                    ) : attendanceExceptions.length === 0 ? (
+                      <p className="small">{t(lang, '目前沒有出勤異常紀錄。', 'No attendance exceptions found.', 'Không có bản ghi chấm công bất thường.')}</p>
+                    ) : (
+                      <div style={{ overflowX: 'auto' }}>
+                        <table className="report-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                          <thead>
+                            <tr>
+                              <th style={{ border: '1px solid #ddd', padding: '8px' }}>{t(lang, '員工編號', 'Employee No.', 'Mã NV')}</th>
+                              <th style={{ border: '1px solid #ddd', padding: '8px' }}>{t(lang, '姓名', 'Name', 'Tên')}</th>
+                              <th style={{ border: '1px solid #ddd', padding: '8px' }}>{t(lang, '日期', 'Date', 'Ngày')}</th>
+                              <th style={{ border: '1px solid #ddd', padding: '8px' }}>{t(lang, '異常類型', 'Exception Type', 'Loại bất thường')}</th>
+                              <th style={{ border: '1px solid #ddd', padding: '8px' }}>{t(lang, '原因', 'Reason', 'Lý do')}</th>
+                              <th style={{ border: '1px solid #ddd', padding: '8px' }}>{t(lang, '狀態', 'Status', 'Trạng thái')}</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {attendanceExceptions.map((row, idx) => (
+                              <tr key={idx}>
+                                <td style={{ border: '1px solid #ddd', padding: '8px' }}>{row.employee_no}</td>
+                                <td style={{ border: '1px solid #ddd', padding: '8px' }}>{row.employee_name}</td>
+                                <td style={{ border: '1px solid #ddd', padding: '8px' }}>{row.work_date}</td>
+                                <td style={{ border: '1px solid #ddd', padding: '8px' }}>{row.exception_type}</td>
+                                <td style={{ border: '1px solid #ddd', padding: '8px' }}>{row.reason_text || '-'}</td>
+                                <td style={{ border: '1px solid #ddd', padding: '8px' }}>{row.status}</td>
                               </tr>
                             ))}
                           </tbody>
