@@ -1181,6 +1181,30 @@ function App() {
     }
   }
 
+  // 新增：填寫異常原因
+  async function submitExceptionReason(row: AttendanceRecord) {
+    if (!currentUser) return
+    const reason = window.prompt('請輸入異常原因，例如：車輛故障、身體不適、交通因素')
+    if (!reason) return
+
+    try {
+      const res = await fetch(`${API_BASE}/api/attendance/exception-reason`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          employee_no: currentUser.employee_no,
+          work_date: row.work_date,
+          reason
+        })
+      })
+      const data = await res.json()
+      alert(data.message || '已送出')
+      await loadAttendance() // 重新載入出勤紀錄
+    } catch (err) {
+      alert('送出失敗，請確認網路或 API 狀態')
+    }
+  }
+
   async function loadAttendance() {
     if (!currentUser) return
     setIsLoadingAttendance(true)
@@ -1987,6 +2011,7 @@ function App() {
                               <th style={{ border: '1px solid #ddd', padding: '8px' }}>{t(lang, '請假時數', 'Leave Hours', 'Giờ nghỉ')}</th>
                               <th style={{ border: '1px solid #ddd', padding: '8px' }}>{t(lang, '加班時數', 'OT Hours', 'Giờ tăng ca')}</th>
                               <th style={{ border: '1px solid #ddd', padding: '8px' }}>{t(lang, '狀態', 'Status', 'Trạng thái')}</th>
+                              <th style={{ border: '1px solid #ddd', padding: '8px' }}>{t(lang, '操作', 'Action', 'Hành động')}</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -1997,7 +2022,16 @@ function App() {
                                 <td style={{ border: '1px solid #ddd', padding: '8px' }}>{row.last_punch_time || '-'}</td>
                                 <td style={{ border: '1px solid #ddd', padding: '8px' }}>{row.leave_hours ?? '-'}</td>
                                 <td style={{ border: '1px solid #ddd', padding: '8px' }}>{row.overtime_hours ?? '-'}</td>
-                                <td style={{ border: '1px solid #ddd', padding: '8px' }}>{row.status_note || '-'}</td>
+                                <td className={row.punch_fix_status !== 'normal' ? 'danger-text' : ''} style={{ border: '1px solid #ddd', padding: '8px' }}>
+                                  {row.punch_fix_status || 'normal'}
+                                </td>
+                                <td style={{ border: '1px solid #ddd', padding: '8px' }}>
+                                  {row.punch_fix_status !== 'normal' && (
+                                    <button onClick={() => submitExceptionReason(row)}>
+                                      {t(lang, '填寫原因', 'Fill Reason', 'Điền lý do')}
+                                    </button>
+                                  )}
+                                </td>
                               </tr>
                             ))}
                           </tbody>
