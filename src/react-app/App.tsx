@@ -626,11 +626,31 @@ function App() {
     }
   }
 
+  // 員工列表（申請頁面右側）根據角色過濾
   async function loadEmployees() {
     try {
       const res = await fetch(`${API_BASE}/api/employees`)
       const data = await res.json()
-      if (data.ok) setEmployeeList(data.employees || [])
+      if (data.ok) {
+        let allEmployees = data.employees || []
+        if (!currentUser) {
+          setEmployeeList([])
+          return
+        }
+        const role = currentUser.system_role
+        if (role === 'hr' || role === 'general_manager') {
+          // HR/總經理：看全部
+          setEmployeeList(allEmployees)
+        } else if (role === 'manager') {
+          // 主管：只看直屬下屬
+          const filtered = allEmployees.filter(emp => emp.direct_manager_no === currentUser.employee_no)
+          setEmployeeList(filtered)
+        } else {
+          // 一般員工：只看自己
+          const filtered = allEmployees.filter(emp => emp.employee_no === currentUser.employee_no)
+          setEmployeeList(filtered)
+        }
+      }
     } catch (err) {
       console.warn('載入員工列表失敗', err)
     }
@@ -1016,7 +1036,6 @@ function App() {
     setImportingOvertimeHr(true)
     setImportOvertimeResult('')
     try {
-      // 解析 Excel
       const data = await file.arrayBuffer()
       const workbook = XLSX.read(data)
       const sheetName = workbook.SheetNames[0]
@@ -1026,7 +1045,6 @@ function App() {
         setImportOvertimeResult('檔案中沒有資料')
         return
       }
-      // 轉換為 API 所需的格式
       const rows = jsonRows.map(row => ({
         employee_no: (row['員工編號'] || row['employee_no'] || '').toString().trim(),
         employee_name: (row['員工姓名'] || row['employee_name'] || '').toString().trim(),
@@ -1111,7 +1129,6 @@ function App() {
           failCount++
           continue
         }
-        // 先查詢員工現有資料
         const empRes = await fetch(`${API_BASE}/api/hr/employees?hr_no=${encodeURIComponent(currentUser.employee_no)}`)
         const empData = await empRes.json()
         const existingEmp = empData.employees?.find((e: any) => e.employee_no === employeeNo)
@@ -1382,6 +1399,7 @@ function App() {
     }
   }
 
+  // 提交異常原因
   async function submitExceptionReason(row: AttendanceRecord) {
     if (!currentUser) return
     const reason = window.prompt('請輸入異常原因，例如：車輛故障、身體不適、交通因素')
@@ -2225,9 +2243,13 @@ function App() {
                                   {row.punch_fix_status || 'normal'}
                                 </td>
                                 <td style={{ border: '1px solid #ddd', padding: '8px' }}>
-                                  {row.punch_fix_status !== 'normal' && (
-                                    <button onClick={() => submitExceptionReason(row)}>
-                                      {t(lang, '填寫原因', 'Fill Reason', 'Điền lý do')}
+                                  {/* 只要有異常（非 normal）就顯示「填寫異常原因」按鈕 */}
+                                  {row.punch_fix_status && row.punch_fix_status !== 'normal' && (
+                                    <button
+                                      className="btn-danger"
+                                      onClick={() => submitExceptionReason(row)}
+                                    >
+                                      {t(lang, '填寫異常原因', 'Fill Exception Reason', 'Điền lý do bất thường')}
                                     </button>
                                   )}
                                 </td>
