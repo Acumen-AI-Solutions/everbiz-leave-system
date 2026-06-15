@@ -29,7 +29,7 @@ type FullEmployee = {
   second_proxy_no: string | null
   second_proxy_name: string | null
   pin_code: string
-  card_no: string | null        // RFID 卡號
+  card_no: string | null
   is_active: number
   created_at: string
   updated_at: string
@@ -442,7 +442,6 @@ function App() {
   const [myOvertimeMessage, setMyOvertimeMessage] = useState('')
   const [isLoadingMyOvertimes, setIsLoadingMyOvertimes] = useState(false)
 
-  // 出勤紀錄狀態
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([])
   const [attendanceMessage, setAttendanceMessage] = useState('')
   const [isLoadingAttendance, setIsLoadingAttendance] = useState(false)
@@ -467,7 +466,6 @@ function App() {
     pendingPunches.length > 0 ||
     pendingOvertimes.length > 0
 
-  // 統一的滾動切換函數
   const gotoSection = (section: SectionType, id: string) => {
     setActiveSection(section)
     setTimeout(() => {
@@ -475,7 +473,6 @@ function App() {
     }, 100)
   }
 
-  // ----- 載入假別 -----
   async function loadLeaveTypes() {
     try {
       const res = await fetch(`${API_BASE}/api/leave/types`)
@@ -504,7 +501,6 @@ function App() {
     return found.name_vi
   }
 
-  // ----- HR 員工管理函數 -----
   function resetEmployeeForm() {
     setEmployeeFormData({
       employee_no: '', employee_name: '', department_name: '', position_title: '',
@@ -535,12 +531,8 @@ function App() {
       is_active: emp.is_active
     })
     setShowEmployeeForm(true)
-
     setTimeout(() => {
-      document.getElementById('employee-section')?.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start',
-      })
+      document.getElementById('employee-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }, 100)
   }
 
@@ -632,7 +624,6 @@ function App() {
     }
   }
 
-  // ----- 登入 -----
   async function handleLogin(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const normalizedEmployeeNo = loginEmployeeNo.trim().toUpperCase()
@@ -723,7 +714,6 @@ function App() {
     resetEmployeeForm()
   }
 
-  // ----- 請假送出 -----
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (isSubmitting) return
@@ -790,7 +780,6 @@ function App() {
     }
   }
 
-  // ----- 補卡送出 -----
   async function handlePunchSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!punchDate || !punchTime || !punchReason.trim()) {
@@ -823,7 +812,6 @@ function App() {
     }
   }
 
-  // ----- 加班送出 -----
   async function handleOvertimeSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const overtimeHours = calculateSimpleHours(overtimeStart, overtimeEnd)
@@ -861,7 +849,6 @@ function App() {
     }
   }
 
-  // ===== Excel 批次匯入加班 =====
   function handleOvertimeExcelUpload(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     if (!file) return
@@ -974,7 +961,6 @@ function App() {
     }
   }
 
-  // ----- 待審核 -----
   async function loadPendingApprovals() {
     const normalizedApproverNo = approverNo.trim().toUpperCase()
     if (!normalizedApproverNo) {
@@ -1102,7 +1088,6 @@ function App() {
     }
   }
 
-  // ----- 我的紀錄 (Silent) -----
   async function loadMyLeavesSilent() {
     if (!currentUser) return
     try {
@@ -1130,7 +1115,6 @@ function App() {
     } catch { /* silent */ }
   }
 
-  // ----- 我的紀錄 (Loading) -----
   async function loadMyLeaves() {
     if (!currentUser) return
     setIsLoadingMyLeaves(true)
@@ -1197,7 +1181,6 @@ function App() {
     }
   }
 
-  // ----- 出勤紀錄 (Attendance) -----
   async function loadAttendance() {
     if (!currentUser) return
     setIsLoadingAttendance(true)
@@ -1283,7 +1266,6 @@ function App() {
     }
   }
 
-  // ----- HR 報表 -----
   async function loadHrReportSilent() {
     if (!canViewHrReport) return
     try {
@@ -1328,28 +1310,22 @@ function App() {
     }
   }
 
-  // ===== 匯出函數（自動補抓最新資料）=====
   async function exportHrLeavesCsv() {
     let leaveData = hrLeaves
-
     if (leaveData.length === 0) {
       const res = await fetch(`${API_BASE}/api/hr/report`)
       const data = await res.json()
-
       if (!data.ok) {
         setHrMessage(t(lang, '匯出失敗，無法取得請假資料', 'Export failed.', 'Xuất thất bại.'))
         return
       }
-
       leaveData = sortByStatus(data.leaves || [])
       setHrLeaves(leaveData)
     }
-
     if (leaveData.length === 0) {
       setHrMessage(t(lang, '目前沒有請假資料可以匯出', 'No leave data to export.', 'Không có dữ liệu.'))
       return
     }
-
     const headers = [
       t(lang, '假單編號', 'ID', 'Mã đơn'),
       t(lang, '員工編號', 'Employee No.', 'Mã NV'),
@@ -1367,7 +1343,6 @@ function App() {
       t(lang, '建立時間', 'Created At', 'Thời gian tạo'),
       t(lang, '更新時間', 'Updated At', 'Thời gian cập nhật'),
     ]
-
     const rows = leaveData.map(leave => [
       leave.id,
       leave.employee_no,
@@ -1385,32 +1360,26 @@ function App() {
       leave.created_at,
       leave.updated_at,
     ])
-
     downloadCsv(rows, headers, `HR_${t(lang, '請假報表', 'Leave_Report', 'Bao_cao_nghi_phep')}`)
     setHrMessage(t(lang, `已匯出 ${leaveData.length} 筆請假報表`, `Exported ${leaveData.length} leave record(s)`, `Đã xuất ${leaveData.length} bản ghi`))
   }
 
   async function exportHrPunchesCsv() {
     let punchData = hrPunches
-
     if (punchData.length === 0) {
       const res = await fetch(`${API_BASE}/api/hr/report`)
       const data = await res.json()
-
       if (!data.ok) {
         setHrMessage(t(lang, '匯出失敗，無法取得補卡資料', 'Export failed.', 'Xuất thất bại.'))
         return
       }
-
       punchData = sortByStatus(data.punches || [])
       setHrPunches(punchData)
     }
-
     if (punchData.length === 0) {
       setHrMessage(t(lang, '目前沒有補卡 / 忘刷資料可以匯出', 'No punch data to export.', 'Không có dữ liệu.'))
       return
     }
-
     const headers = [
       t(lang, '補卡編號', 'ID', 'Mã đơn'),
       t(lang, '員工編號', 'Employee No.', 'Mã NV'),
@@ -1425,7 +1394,6 @@ function App() {
       t(lang, '建立時間', 'Created At', 'Thời gian tạo'),
       t(lang, '更新時間', 'Updated At', 'Thời gian cập nhật'),
     ]
-
     const rows = punchData.map(punch => [
       punch.id,
       punch.employee_no,
@@ -1440,32 +1408,26 @@ function App() {
       punch.created_at,
       punch.updated_at,
     ])
-
     downloadCsv(rows, headers, `HR_${t(lang, '補卡忘刷報表', 'Punch_Report', 'Bao_cao_cham_cong')}`)
     setHrMessage(t(lang, `已匯出 ${punchData.length} 筆補卡 / 忘刷報表`, `Exported ${punchData.length} punch record(s)`, `Đã xuất ${punchData.length} bản ghi`))
   }
 
   async function exportHrOvertimesCsv() {
     let overtimeData = hrOvertimes
-
     if (overtimeData.length === 0) {
       const res = await fetch(`${API_BASE}/api/hr/report`)
       const data = await res.json()
-
       if (!data.ok) {
         setHrMessage(t(lang, '匯出失敗，無法取得加班資料', 'Export failed.', 'Xuất thất bại.'))
         return
       }
-
       overtimeData = sortByStatus(data.overtimes || [])
       setHrOvertimes(overtimeData)
     }
-
     if (overtimeData.length === 0) {
       setHrMessage(t(lang, '目前沒有加班資料可以匯出', 'No overtime data to export.', 'Không có dữ liệu.'))
       return
     }
-
     const headers = [
       t(lang, '員工編號', 'Employee No.', 'Mã NV'),
       t(lang, '姓名', 'Name', 'Tên'),
@@ -1485,7 +1447,6 @@ function App() {
       t(lang, '給付方式', 'Pay Type', 'Hình thức thanh toán'),
       t(lang, '狀態', 'Status', 'Trạng thái'),
     ]
-
     const rows = overtimeData.map(ot => [
       ot.employee_no,
       ot.employee_name,
@@ -1505,12 +1466,10 @@ function App() {
       ot.pay_type || '',
       statusText(ot.status, lang),
     ])
-
     downloadCsv(rows, headers, `HR_${t(lang, '加班報表', 'Overtime_Report', 'Bao_cao_tang_ca')}`)
     setHrMessage(t(lang, `已匯出 ${overtimeData.length} 筆加班報表`, `Exported ${overtimeData.length} overtime record(s)`, `Đã xuất ${overtimeData.length} bản ghi`))
   }
 
-  // ----- useEffect -----
   useEffect(() => {
     if (!currentUser) return
     loadEmployees()
@@ -1549,7 +1508,6 @@ function App() {
     return approverLabel(approverNo, approverName)
   }
 
-  // ==================== 渲染 ====================
   return (
     <div className="page">
       <nav className="top-nav">
@@ -1578,9 +1536,14 @@ function App() {
               </button>
             )}
             {canViewHrReport && (
-              <button type="button" onClick={() => gotoSection('hr', 'hr-section')}>
-                {t(lang, 'HR報表', 'HR Report', 'Báo cáo nhân sự')}
-              </button>
+              <>
+                <button type="button" onClick={() => gotoSection('hr', 'hr-section')}>
+                  {t(lang, 'HR報表', 'HR Report', 'Báo cáo nhân sự')}
+                </button>
+                <button type="button" onClick={() => gotoSection('hr', 'hr-import-section')}>
+                  {t(lang, '人資倒資料', 'HR Data Import', 'Nhập dữ liệu nhân sự')}
+                </button>
+              </>
             )}
             {canManageEmployees && (
               <button type="button" onClick={() => gotoSection('employees', 'employee-section')}>
@@ -1647,7 +1610,6 @@ function App() {
             <div className="badge">PWA</div>
           </header>
 
-          {/* 員工管理區塊 */}
           {activeSection === 'employees' && canManageEmployees && (
             <section id="employee-section" className="card result-card">
               <h2>{t(lang, '員工資料管理', 'Employee Management', 'Quản lý nhân viên')}</h2>
@@ -1658,7 +1620,6 @@ function App() {
                 <button className="submit-btn" onClick={newEmployee}>{t(lang, '新增員工', 'Add Employee', 'Thêm nhân viên')}</button>
               </div>
               {hrEmployeeMessage && <div className="note-box">{hrEmployeeMessage}</div>}
-
               {showEmployeeForm && (
                 <div style={{ margin: '20px 0', padding: '16px', border: '1px solid #ddd', borderRadius: '12px' }}>
                   <h3>{editingEmployee ? t(lang, '編輯員工', 'Edit Employee', 'Sửa nhân viên') : t(lang, '新增員工', 'Add Employee', 'Thêm nhân viên')}</h3>
@@ -1697,12 +1658,7 @@ function App() {
                       <input type="text" placeholder={t(lang, '登入 PIN 碼', 'Login PIN Code', 'Mã PIN đăng nhập')} value={employeeFormData.pin_code} onChange={e => setEmployeeFormData({ ...employeeFormData, pin_code: e.target.value })} />
                     </div>
                     <div className="two">
-                      <input
-                        type="text"
-                        placeholder={t(lang, 'RFID 卡號 (選填)', 'RFID Card No. (optional)', 'Mã thẻ RFID (tùy chọn)')}
-                        value={employeeFormData.card_no}
-                        onChange={e => setEmployeeFormData({ ...employeeFormData, card_no: e.target.value })}
-                      />
+                      <input type="text" placeholder={t(lang, 'RFID 卡號 (選填)', 'RFID Card No. (optional)', 'Mã thẻ RFID (tùy chọn)')} value={employeeFormData.card_no} onChange={e => setEmployeeFormData({ ...employeeFormData, card_no: e.target.value })} />
                     </div>
                     <div className="employee-active-row">
                       <label>
@@ -1717,7 +1673,6 @@ function App() {
                   </form>
                 </div>
               )}
-
               {hrEmployees.length === 0 ? (
                 <p className="small">{t(lang, '暫無員工資料', 'No employee data', 'Chưa có dữ liệu nhân viên')}</p>
               ) : (
@@ -1764,7 +1719,6 @@ function App() {
             </section>
           )}
 
-          {/* 表單區塊（請假、補卡、加班） */}
           {activeSection === 'form' && (
             <div id="leave-section">
               <section className="card result-card">
@@ -2056,7 +2010,6 @@ function App() {
             </div>
           )}
 
-          {/* 待審核區塊 */}
           {activeSection === 'approvals' && canApprove && (
             <section id="approval-section" className="card result-card">
               <h2>{t(lang, '待審核 / 代理審核', 'Pending / Proxy Approval', 'Chờ duyệt / Duyệt thay')}</h2>
@@ -2133,83 +2086,99 @@ function App() {
             </section>
           )}
 
-          {/* HR報表區塊 */}
           {activeSection === 'hr' && canViewHrReport && (
-            <section id="hr-section" className="card result-card">
-              <h2>{t(lang, 'HR 全部報表', 'All HR Reports', 'Tất cả báo cáo HR')}</h2>
-              <div className="approval-search">
-                <button className="submit-btn" onClick={loadHrReport} disabled={isLoadingHrLeaves}>{isLoadingHrLeaves ? t(lang, '查詢中...', 'Loading...', 'Đang tải...') : t(lang, '查詢全部報表', 'Load All Reports', 'Tải tất cả báo cáo')}</button>
-                <button className="submit-btn" onClick={exportHrLeavesCsv}>{t(lang, '匯出請假報表', 'Export Leave CSV', 'Xuất nghỉ phép CSV')}</button>
-                <button className="submit-btn" onClick={exportHrPunchesCsv}>{t(lang, '匯出補卡 / 忘刷報表', 'Export Punch CSV', 'Xuất chấm công CSV')}</button>
-                <button className="submit-btn" onClick={exportHrOvertimesCsv}>{t(lang, '匯出加班報表', 'Export Overtime CSV', 'Xuất tăng ca CSV')}</button>
-              </div>
-              {hrMessage && <div className="note-box">{hrMessage}</div>}
-              {hrLeaves.length === 0 && hrPunches.length === 0 && hrOvertimes.length === 0 ? (
-                <p className="small">{t(lang, '目前沒有 HR 報表資料。', 'No HR report records found.', 'Không có dữ liệu báo cáo HR.')}</p>
-              ) : (
-                <>
-                  {hrLeaves.length > 0 && (
-                    <>
-                      <h3>{t(lang, '請假報表', 'Leave Report', 'Báo cáo nghỉ phép')}</h3>
-                      <div className="approval-list">
-                        {hrLeaves.map(leave => (
-                          <div className="approval-item" key={`hr-leave-${leave.id}`}>
-                            <div>
-                              <strong>#{leave.id}｜{leave.employee_no} {leave.employee_name}｜{statusText(leave.status, lang)}</strong>
-                              <p>{getLeaveTypeDisplayName(leave.leave_type)}｜{leave.start_date} {leave.start_time || ''} ~ {leave.end_date} {leave.end_time || ''}</p>
-                              <p>{t(lang, '時數', 'Hours', 'Số giờ')}：{leave.total_hours ?? '-'} {t(lang, '小時', 'hr(s)', 'giờ')}</p>
-                              <p>{t(lang, '原因', 'Reason', 'Lý do')}：{leave.reason || t(lang, '未填寫', 'N/A', 'Chưa điền')}</p>
-                              <p>{t(lang, '審核主管', 'Approver', 'Người duyệt')}：{approverDisplay(leave.current_approver_no, leave.current_approver_name)}</p>
-                              <p>{t(lang, '建立時間', 'Created At', 'Thời gian tạo')}：{leave.created_at}</p>
-                              {leave.status === 'voided' && <><p>{t(lang, '作廢人員', 'Voided By', 'Người hủy')}：{leave.voided_by_name || '-'}</p><p>{t(lang, '作廢原因', 'Void Reason', 'Lý do hủy')}：{leave.void_reason || '-'}</p></>}
-                              {leave.status === 'cancelled' && <><p>{t(lang, '取消人員', 'Cancelled By', 'Người hủy bỏ')}：{leave.cancelled_by_name || '-'}</p><p>{t(lang, '取消原因', 'Cancel Reason', 'Lý do hủy bỏ')}：{leave.cancel_reason || '-'}</p><p>{t(lang, '取消時間', 'Cancelled At', 'Thời gian hủy bỏ')}：{leave.cancelled_at || '-'}</p></>}
+            <>
+              <section id="hr-section" className="card result-card">
+                <h2>{t(lang, 'HR 全部報表', 'All HR Reports', 'Tất cả báo cáo HR')}</h2>
+                <div className="approval-search">
+                  <button className="submit-btn" onClick={loadHrReport} disabled={isLoadingHrLeaves}>{isLoadingHrLeaves ? t(lang, '查詢中...', 'Loading...', 'Đang tải...') : t(lang, '查詢全部報表', 'Load All Reports', 'Tải tất cả báo cáo')}</button>
+                  <button className="submit-btn" onClick={exportHrLeavesCsv}>{t(lang, '匯出請假報表', 'Export Leave CSV', 'Xuất nghỉ phép CSV')}</button>
+                  <button className="submit-btn" onClick={exportHrPunchesCsv}>{t(lang, '匯出補卡 / 忘刷報表', 'Export Punch CSV', 'Xuất chấm công CSV')}</button>
+                  <button className="submit-btn" onClick={exportHrOvertimesCsv}>{t(lang, '匯出加班報表', 'Export Overtime CSV', 'Xuất tăng ca CSV')}</button>
+                </div>
+                {hrMessage && <div className="note-box">{hrMessage}</div>}
+                {hrLeaves.length === 0 && hrPunches.length === 0 && hrOvertimes.length === 0 ? (
+                  <p className="small">{t(lang, '目前沒有 HR 報表資料。', 'No HR report records found.', 'Không có dữ liệu báo cáo HR.')}</p>
+                ) : (
+                  <>
+                    {hrLeaves.length > 0 && (
+                      <>
+                        <h3>{t(lang, '請假報表', 'Leave Report', 'Báo cáo nghỉ phép')}</h3>
+                        <div className="approval-list">
+                          {hrLeaves.map(leave => (
+                            <div className="approval-item" key={`hr-leave-${leave.id}`}>
+                              <div>
+                                <strong>#{leave.id}｜{leave.employee_no} {leave.employee_name}｜{statusText(leave.status, lang)}</strong>
+                                <p>{getLeaveTypeDisplayName(leave.leave_type)}｜{leave.start_date} {leave.start_time || ''} ~ {leave.end_date} {leave.end_time || ''}</p>
+                                <p>{t(lang, '時數', 'Hours', 'Số giờ')}：{leave.total_hours ?? '-'} {t(lang, '小時', 'hr(s)', 'giờ')}</p>
+                                <p>{t(lang, '原因', 'Reason', 'Lý do')}：{leave.reason || t(lang, '未填寫', 'N/A', 'Chưa điền')}</p>
+                                <p>{t(lang, '審核主管', 'Approver', 'Người duyệt')}：{approverDisplay(leave.current_approver_no, leave.current_approver_name)}</p>
+                                <p>{t(lang, '建立時間', 'Created At', 'Thời gian tạo')}：{leave.created_at}</p>
+                                {leave.status === 'voided' && <><p>{t(lang, '作廢人員', 'Voided By', 'Người hủy')}：{leave.voided_by_name || '-'}</p><p>{t(lang, '作廢原因', 'Void Reason', 'Lý do hủy')}：{leave.void_reason || '-'}</p></>}
+                                {leave.status === 'cancelled' && <><p>{t(lang, '取消人員', 'Cancelled By', 'Người hủy bỏ')}：{leave.cancelled_by_name || '-'}</p><p>{t(lang, '取消原因', 'Cancel Reason', 'Lý do hủy bỏ')}：{leave.cancel_reason || '-'}</p><p>{t(lang, '取消時間', 'Cancelled At', 'Thời gian hủy bỏ')}：{leave.cancelled_at || '-'}</p></>}
+                              </div>
+                              {leave.status !== 'voided' && <div className="approval-actions"><button className="reject-btn" onClick={() => handleVoidLeave(leave.id)}>{t(lang, '作廢', 'Void', 'Hủy')}</button></div>}
                             </div>
-                            {leave.status !== 'voided' && <div className="approval-actions"><button className="reject-btn" onClick={() => handleVoidLeave(leave.id)}>{t(lang, '作廢', 'Void', 'Hủy')}</button></div>}
-                          </div>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                  {hrPunches.length > 0 && (
-                    <>
-                      <h3>{t(lang, '補卡 / 忘刷報表', 'Punch Correction Report', 'Báo cáo bổ sung chấm công')}</h3>
-                      <div className="approval-list">
-                        {hrPunches.map(punch => (
-                          <div className="approval-item" key={`hr-punch-${punch.id}`}>
-                            <div>
-                              <strong>#{punch.id}｜{punch.employee_no} {punch.employee_name}｜{statusText(punch.status, lang)}</strong>
-                              <p>{punch.punch_type}｜{punch.punch_date} {punch.punch_time}</p>
-                              <p>{t(lang, '原因', 'Reason', 'Lý do')}：{punch.reason || t(lang, '未填寫', 'N/A', 'Chưa điền')}</p>
-                              <p>{t(lang, '審核主管', 'Approver', 'Người duyệt')}：{approverDisplay(punch.current_approver_no, punch.current_approver_name)}</p>
-                              <p>{t(lang, '建立時間', 'Created At', 'Thời gian tạo')}：{punch.created_at}</p>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                    {hrPunches.length > 0 && (
+                      <>
+                        <h3>{t(lang, '補卡 / 忘刷報表', 'Punch Correction Report', 'Báo cáo bổ sung chấm công')}</h3>
+                        <div className="approval-list">
+                          {hrPunches.map(punch => (
+                            <div className="approval-item" key={`hr-punch-${punch.id}`}>
+                              <div>
+                                <strong>#{punch.id}｜{punch.employee_no} {punch.employee_name}｜{statusText(punch.status, lang)}</strong>
+                                <p>{punch.punch_type}｜{punch.punch_date} {punch.punch_time}</p>
+                                <p>{t(lang, '原因', 'Reason', 'Lý do')}：{punch.reason || t(lang, '未填寫', 'N/A', 'Chưa điền')}</p>
+                                <p>{t(lang, '審核主管', 'Approver', 'Người duyệt')}：{approverDisplay(punch.current_approver_no, punch.current_approver_name)}</p>
+                                <p>{t(lang, '建立時間', 'Created At', 'Thời gian tạo')}：{punch.created_at}</p>
+                              </div>
                             </div>
-                          </div>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                  {hrOvertimes.length > 0 && (
-                    <>
-                      <h3>{t(lang, '加班報表', 'Overtime Report', 'Báo cáo tăng ca')}</h3>
-                      <div className="approval-list">
-                        {hrOvertimes.map(ot => (
-                          <div className="approval-item" key={`hr-ot-${ot.id}`}>
-                            <div>
-                              <strong>#{ot.id}｜{ot.employee_no} {ot.employee_name}｜{statusText(ot.status, lang)}</strong>
-                              <p>{ot.overtime_type}｜{ot.overtime_date} {ot.start_time}~{ot.end_time}</p>
-                              <p>{t(lang, '時數', 'Hours', 'Số giờ')}：{ot.total_hours ?? '-'} {t(lang, '小時', 'hr(s)', 'giờ')}</p>
-                              <p>{t(lang, '原因', 'Reason', 'Lý do')}：{ot.reason || t(lang, '未填寫', 'N/A', 'Chưa điền')}</p>
-                              <p>{t(lang, '審核主管', 'Approver', 'Người duyệt')}：{approverDisplay(ot.current_approver_no, ot.current_approver_name)}</p>
-                              <p>{t(lang, '建立時間', 'Created At', 'Thời gian tạo')}：{ot.created_at}</p>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                    {hrOvertimes.length > 0 && (
+                      <>
+                        <h3>{t(lang, '加班報表', 'Overtime Report', 'Báo cáo tăng ca')}</h3>
+                        <div className="approval-list">
+                          {hrOvertimes.map(ot => (
+                            <div className="approval-item" key={`hr-ot-${ot.id}`}>
+                              <div>
+                                <strong>#{ot.id}｜{ot.employee_no} {ot.employee_name}｜{statusText(ot.status, lang)}</strong>
+                                <p>{ot.overtime_type}｜{ot.overtime_date} {ot.start_time}~{ot.end_time}</p>
+                                <p>{t(lang, '時數', 'Hours', 'Số giờ')}：{ot.total_hours ?? '-'} {t(lang, '小時', 'hr(s)', 'giờ')}</p>
+                                <p>{t(lang, '原因', 'Reason', 'Lý do')}：{ot.reason || t(lang, '未填寫', 'N/A', 'Chưa điền')}</p>
+                                <p>{t(lang, '審核主管', 'Approver', 'Người duyệt')}：{approverDisplay(ot.current_approver_no, ot.current_approver_name)}</p>
+                                <p>{t(lang, '建立時間', 'Created At', 'Thời gian tạo')}：{ot.created_at}</p>
+                              </div>
                             </div>
-                          </div>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </>
-              )}
-            </section>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </>
+                )}
+              </section>
+
+              <section id="hr-import-section" className="card result-card">
+                <h2>{t(lang, '人資倒資料區', 'HR Data Import', 'Nhập dữ liệu nhân sự')}</h2>
+                <div className="approval-search">
+                  <button className="submit-btn" onClick={() => alert('匯入門禁 TXT 功能待實作')}>
+                    {t(lang, '匯入門禁 TXT', 'Import Access TXT', 'Nhập TXT cửa')}
+                  </button>
+                  <button className="submit-btn" onClick={() => alert('匯入加班 Excel 功能待實作')}>
+                    {t(lang, '匯入加班 Excel', 'Import Overtime Excel', 'Nhập Excel tăng ca')}
+                  </button>
+                  <button className="submit-btn" onClick={() => alert('匯入員工卡號功能待實作')}>
+                    {t(lang, '匯入員工卡號', 'Import Employee Card No.', 'Nhập mã thẻ nhân viên')}
+                  </button>
+                </div>
+              </section>
+            </>
           )}
         </>
       )}
