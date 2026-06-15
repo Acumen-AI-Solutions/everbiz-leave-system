@@ -1030,7 +1030,7 @@ function App() {
     }
   }
 
-  // 人資倒資料區：加班 Excel 獨立匯入
+  // 人資倒資料區：加班 Excel 獨立匯入（不使用原本的 overtimeImportRows 狀態，避免干擾）
   async function handleOvertimeHrImport(file: File) {
     if (!currentUser) return
     setImportingOvertimeHr(true)
@@ -1931,7 +1931,7 @@ function App() {
                         <th>{t(lang, '卡號', 'Card No.', 'Mã thẻ')}</th>
                         <th>{t(lang, '狀態', 'Status', 'Trạng thái')}</th>
                         <th>{t(lang, '操作', 'Actions', 'Hành động')}</th>
-                      <tr>
+                      </tr>
                     </thead>
                     <tbody>
                       {hrEmployees.map(emp => (
@@ -2243,6 +2243,7 @@ function App() {
                                   {row.punch_fix_status || 'normal'}
                                 </td>
                                 <td style={{ border: '1px solid #ddd', padding: '8px' }}>
+                                  {/* 只要有異常（非 normal）就顯示「填寫異常原因」按鈕 */}
                                   {row.punch_fix_status && row.punch_fix_status !== 'normal' && (
                                     <button
                                       className="btn-danger"
