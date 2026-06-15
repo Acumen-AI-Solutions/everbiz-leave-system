@@ -29,6 +29,7 @@ type FullEmployee = {
   second_proxy_no: string | null
   second_proxy_name: string | null
   pin_code: string
+  card_no: string | null        // RFID 卡號
   is_active: number
   created_at: string
   updated_at: string
@@ -388,7 +389,7 @@ function App() {
     employee_no: '', employee_name: '', department_name: '', position_title: '',
     rank_type: '', direct_manager_no: '', direct_manager_name: '',
     first_proxy_no: '', first_proxy_name: '', second_proxy_no: '', second_proxy_name: '',
-    pin_code: '', is_active: 1
+    pin_code: '', card_no: '', is_active: 1
   })
 
   const [employeeNo, setEmployeeNo] = useState('')
@@ -509,7 +510,7 @@ function App() {
       employee_no: '', employee_name: '', department_name: '', position_title: '',
       rank_type: '', direct_manager_no: '', direct_manager_name: '',
       first_proxy_no: '', first_proxy_name: '', second_proxy_no: '', second_proxy_name: '',
-      pin_code: '', is_active: 1
+      pin_code: '', card_no: '', is_active: 1
     })
     setEditingEmployee(null)
     setShowEmployeeForm(false)
@@ -530,6 +531,7 @@ function App() {
       second_proxy_no: emp.second_proxy_no || '',
       second_proxy_name: emp.second_proxy_name || '',
       pin_code: emp.pin_code || '',
+      card_no: emp.card_no || '',
       is_active: emp.is_active
     })
     setShowEmployeeForm(true)
@@ -1201,7 +1203,7 @@ function App() {
     setIsLoadingAttendance(true)
     setAttendanceMessage(t(lang, '查詢中...', 'Loading...', 'Đang tải...'))
     try {
-      const res = await fetch(`${API_BASE}/api/attendance/daily?employee_no=${encodeURIComponent(currentUser.employee_no)}`)
+      const res = await fetch(`${API_BASE}/api/attendance/daily?viewer_no=${encodeURIComponent(currentUser.employee_no)}`)
       const data = await res.json()
       if (!data.ok) {
         setAttendanceMessage(data.message || t(lang, '查詢出勤紀錄失敗', 'Failed to load attendance records', 'Tải chấm công thất bại'))
@@ -1694,6 +1696,14 @@ function App() {
                     <div className="two">
                       <input type="text" placeholder={t(lang, '登入 PIN 碼', 'Login PIN Code', 'Mã PIN đăng nhập')} value={employeeFormData.pin_code} onChange={e => setEmployeeFormData({ ...employeeFormData, pin_code: e.target.value })} />
                     </div>
+                    <div className="two">
+                      <input
+                        type="text"
+                        placeholder={t(lang, 'RFID 卡號 (選填)', 'RFID Card No. (optional)', 'Mã thẻ RFID (tùy chọn)')}
+                        value={employeeFormData.card_no}
+                        onChange={e => setEmployeeFormData({ ...employeeFormData, card_no: e.target.value })}
+                      />
+                    </div>
                     <div className="employee-active-row">
                       <label>
                         <input type="checkbox" checked={employeeFormData.is_active === 1} onChange={e => setEmployeeFormData({ ...employeeFormData, is_active: e.target.checked ? 1 : 0 })} />
@@ -1722,6 +1732,7 @@ function App() {
                         <th>{t(lang, '主管', 'Manager', 'Quản lý')}</th>
                         <th>{t(lang, '第一代理人', '1st Proxy', 'Đại diện 1')}</th>
                         <th>{t(lang, '第二代理人', '2nd Proxy', 'Đại diện 2')}</th>
+                        <th>{t(lang, '卡號', 'Card No.', 'Mã thẻ')}</th>
                         <th>{t(lang, '狀態', 'Status', 'Trạng thái')}</th>
                         <th>{t(lang, '操作', 'Actions', 'Hành động')}</th>
                       </tr>
@@ -1736,6 +1747,7 @@ function App() {
                           <td>{emp.direct_manager_name} ({emp.direct_manager_no})</td>
                           <td>{emp.first_proxy_name} ({emp.first_proxy_no})</td>
                           <td>{emp.second_proxy_name} ({emp.second_proxy_no})</td>
+                          <td>{emp.card_no || ''}</td>
                           <td>{emp.is_active ? t(lang, '啟用', 'Active', 'Kích hoạt') : t(lang, '停用', 'Inactive', 'Vô hiệu')}</td>
                           <td>
                             <button className="approve-btn" onClick={() => editEmployee(emp)}>{t(lang, '編輯', 'Edit', 'Sửa')}</button>
