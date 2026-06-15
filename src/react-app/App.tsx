@@ -1099,17 +1099,25 @@ function App() {
         const worksheet = workbook.Sheets[sheetName]
         rows = XLSX.utils.sheet_to_json(worksheet)
       } else {
-        const text = await file.text()
-        const lines = text.split(/\r?\n/).filter(l => l.trim())
-        const headers = lines[0].split(',').map(h => h.trim())
-        const dataRows = lines.slice(1).map(line => {
-          const values = line.split(',')
-          const obj: any = {}
-          headers.forEach((h, idx) => { obj[h] = values[idx]?.trim() })
-          return obj
-        })
-        rows = dataRows
-      }
+          const text = await file.text()
+          const lines = text.split(/\r?\n/).filter(l => l.trim())
+          if (fileExt === 'txt') {
+            rows = lines.map(line => {
+              const parts = line.split(',')
+              if (parts.length < 3) return null
+              return { employee_no: parts[0].trim(), card_no: `${parts[1].trim()},${parts[2].trim()}` }
+            }).filter(Boolean) as any[]
+          } else {
+            const headers = lines[0].split(',').map(h => h.trim())
+            const dataRows = lines.slice(1).map(line => {
+              const values = line.split(',')
+              const obj: any = {}
+              headers.forEach((h, idx) => { obj[h] = values[idx]?.trim() })
+              return obj
+            })
+            rows = dataRows
+          }
+        }
 
       if (rows.length === 0) {
         setImportCardResult('沒有找到資料')
