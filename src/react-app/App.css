@@ -671,3 +671,48 @@ input[readonly] {
     margin-bottom: 10px;
   }
 }
+/* ===== 員工表格固定表頭與首欄（新增） ===== */
+.employee-table-wrap {
+  max-height: 620px;
+  overflow: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+}
+
+.employee-table-wrap table {
+  margin: 0;
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.employee-table-wrap thead th {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: #f0fdfa;
+}
+
+.employee-table-wrap th:first-child,
+.employee-table-wrap td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 4;
+  background: white;
+}
+
+.employee-table-wrap thead th:first-child {
+  z-index: 6;
+  background: #f0fdfa;
+}
+
+/* 視覺優化 */
+.employee-table th,
+.employee-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid #e5e7eb;
+  text-align: left;
+  white-space: nowrap;
+}
+.employee-table th {
+  background: #f1f5f9;
+}
