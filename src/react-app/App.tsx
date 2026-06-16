@@ -790,7 +790,7 @@ function App() {
     setOvertimeImportRows([])
   }
 
-  // ========== 整合點 1：修改後的 handleSubmit（已加入病假提示） ==========
+  // ========== 修改點 1：更新 handleSubmit 中的病假提示 ==========
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (isSubmitting) return
@@ -849,11 +849,11 @@ function App() {
       setReason('')
       setError('')
 
-      // ✅ 整合點：病假提示
+      // ✅ 修改點 1：更新病假提示訊息
       const currentLeaveType = leaveTypeOptions.find(opt => opt.code === leaveType)
       const displayName = currentLeaveType ? currentLeaveType.name_zh : leaveType
       if (displayName.includes('病假') || displayName.includes('sick')) {
-        alert('病假申請已送出，系統會通知人資提醒繳交診斷書。')
+        alert('病假申請已送出，請用 Email 附上診斷書照片寄到 imd13@everbiz.com.tw。')
       }
 
       await loadMyLeavesSilent()
@@ -863,6 +863,15 @@ function App() {
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  // ========== 修改點 2：新增 openMedicalEmail 函數 ==========
+  function openMedicalEmail() {
+    const subject = encodeURIComponent(`病假診斷書照片 - ${employeeName} ${employeeNo}`)
+    const body = encodeURIComponent(
+      `您好：\n\n我是 ${employeeName}（${employeeNo}）。\n我要補寄病假診斷書照片。\n\n請在此 Email 附上照片後寄出。\n\n謝謝。`
+    )
+    window.location.href = `mailto:imd13@everbiz.com.tw?subject=${subject}&body=${body}`
   }
 
   async function handlePunchSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -2287,6 +2296,16 @@ setImportTxtResult(`成功 ${data.inserted} 筆，錯誤 ${data.errors?.length |
                       ? t(lang, '三天以上請假已直接送交董事長審核，請耐心等候。', 'Leave request for more than 3 days has been sent directly to the Chairman for approval.', 'Đơn nghỉ trên 3 ngày đã được gửi trực tiếp đến Chủ tịch để phê duyệt.')
                       : t(lang, '假單已送出，將由主管審核。', 'Leave request submitted and will be reviewed by your supervisor.', 'Đơn nghỉ đã được gửi và sẽ được quản lý xem xét.')}
                   </p>
+
+                  {/* ========== 修改點 3：病假按鈕 ========== */}
+                  {getLeaveTypeDisplayName(result.leaveType).includes('病假') && (
+                    <div style={{ marginTop: '16px' }}>
+                      <button type="button" className="submit-btn" onClick={openMedicalEmail}>
+                        寄診斷書照片到人資信箱
+                      </button>
+                    </div>
+                  )}
+                  {/* ========== 修改點 3 結束 ========== */}
                 </section>
               )}
 
