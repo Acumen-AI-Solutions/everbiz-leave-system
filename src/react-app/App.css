@@ -601,3 +601,73 @@ input[readonly] {
   color: #dc2626;
   font-weight: 700;
 }
+
+/* ========== 新增：出勤總報表樣式 ========== */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.toolbar input[type="month"] {
+  width: 180px;
+  margin-bottom: 0;
+}
+
+.toolbar button {
+  border: 0;
+  background: #0f766e;
+  color: white;
+  border-radius: 14px;
+  padding: 12px 16px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.toolbar button:hover {
+  background: #115e59;
+}
+
+.message {
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  color: #334155;
+  padding: 10px 12px;
+  border-radius: 12px;
+  margin: 12px 0;
+  font-weight: 700;
+}
+
+.summary-table {
+  width: max-content;
+  min-width: 100%;
+  table-layout: auto;
+  border-collapse: collapse;
+}
+
+.summary-table th,
+.summary-table td {
+  white-space: nowrap;
+  text-align: center;
+}
+
+.summary-table th:first-child,
+.summary-table td:first-child,
+.summary-table th:nth-child(2),
+.summary-table td:nth-child(2) {
+  text-align: left;
+}
+
+@media (max-width: 720px) {
+  .toolbar {
+    display: block;
+  }
+
+  .toolbar input[type="month"],
+  .toolbar button {
+    width: 100%;
+    margin-bottom: 10px;
+  }
+}
