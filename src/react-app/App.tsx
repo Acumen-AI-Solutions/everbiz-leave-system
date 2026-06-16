@@ -866,13 +866,16 @@ function App() {
   }
 
   // ========== 修改點 2：新增 openMedicalEmail 函數 ==========
-  function openMedicalEmail() {
-    const subject = encodeURIComponent(`病假診斷書照片 - ${employeeName} ${employeeNo}`)
-    const body = encodeURIComponent(
-      `您好：\n\n我是 ${employeeName}（${employeeNo}）。\n我要補寄病假診斷書照片。\n\n請在此 Email 附上照片後寄出。\n\n謝謝。`
-    )
-    window.location.href = `mailto:imd13@everbiz.com.tw?subject=${subject}&body=${body}`
-  }
+ function openMedicalEmail() {
+  const subject = encodeURIComponent(`病假診斷書照片 - ${employeeName} ${employeeNo}`)
+  const body = encodeURIComponent(
+    `您好：\n\n我是 ${employeeName}（${employeeNo}）。\n我要補寄病假診斷書照片。\n\n請在此 Email 附上照片後寄出。\n\n謝謝。`
+  )
+
+  const mailUrl = `mailto:imd13@everbiz.com.tw?subject=${subject}&body=${body}`
+
+  window.open(mailUrl, '_blank')
+}
 
   async function handlePunchSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
