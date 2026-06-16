@@ -155,6 +155,25 @@ type AttendanceException = {
   status: string
 }
 
+type AttendanceSummary = {
+  employee_no: string
+  employee_name: string
+  department_name?: string
+  work_days: number
+  approved_leave_days?: number
+  actual_attendance_days?: number
+  expected_work_days: number
+  late_count: number
+  late_grace_count: number
+  early_leave_count: number
+  leave_hours: number
+  overtime_hours: number
+  overtime_days: number
+  formatted_late_rate?: string
+  formatted_attendance_rate?: string
+  formatted_actual_attendance_rate?: string
+}
+
 type OvertimeImportRow = {
   employee_no: string
   employee_name: string
@@ -464,6 +483,12 @@ function App() {
   // 出勤異常報表狀態
   const [attendanceExceptions, setAttendanceExceptions] = useState<AttendanceException[]>([])
   const [loadingExceptions, setLoadingExceptions] = useState(false)
+
+  // 出勤總報表狀態
+  const [summaryMonth, setSummaryMonth] = useState('2026-06')
+  const [attendanceSummary, setAttendanceSummary] = useState<AttendanceSummary[]>([])
+  const [summaryMessage, setSummaryMessage] = useState('')
+  const [isLoadingSummary, setIsLoadingSummary] = useState(false)
 
   // 人資倒資料區狀態
   const [importTxtResult, setImportTxtResult] = useState('')
@@ -1501,6 +1526,81 @@ function App() {
     }
   }
 
+  // ========== 新增：出勤總報表查詢 ==========
+  async function loadAttendanceSummary() {
+    if (!currentUser) return
+
+    setIsLoadingSummary(true)
+    setSummaryMessage('查詢總報表中...')
+
+    try {
+      let url = ''
+
+      if (currentUser.system_role === 'hr' || currentUser.system_role === 'general_manager') {
+        url = `${API_BASE}/api/hr/attendance-summary?hr_no=${encodeURIComponent(currentUser.employee_no)}&month=${summaryMonth}`
+      } else if (currentUser.system_role === 'manager') {
+        url = `${API_BASE}/api/report/team-summary?viewer_no=${encodeURIComponent(currentUser.employee_no)}&month=${summaryMonth}`
+      } else {
+        url = `${API_BASE}/api/report/my-summary?employee_no=${encodeURIComponent(currentUser.employee_no)}&month=${summaryMonth}`
+      }
+
+      const res = await fetch(url)
+      const data = await res.json()
+
+      if (!data.ok) {
+        setSummaryMessage(data.message || '總報表查詢失敗')
+        setAttendanceSummary([])
+        return
+      }
+
+      const rows = Array.isArray(data.data) ? data.data : [data.data]
+      setAttendanceSummary(rows)
+      setSummaryMessage(`已載入 ${rows.length} 筆總報表`)
+    } catch {
+      setSummaryMessage('總報表查詢失敗，請確認 API 是否正常')
+      setAttendanceSummary([])
+    } finally {
+      setIsLoadingSummary(false)
+    }
+  }
+
+  function exportAttendanceSummaryCsv() {
+    if (attendanceSummary.length === 0) {
+      setSummaryMessage('目前沒有總報表資料可以匯出')
+      return
+    }
+
+    const headers = [
+      '員工編號', '姓名', '部門',
+      '應出勤天數', '刷卡出勤天數', '核准請假天數', '實際出勤天數',
+      '出勤率', '實際出勤率',
+      '遲到次數', '10分鐘內遲到', '早退次數', '遲到率',
+      '請假時數', '加班時數', '加班天數',
+    ]
+
+    const rows = attendanceSummary.map(row => [
+      row.employee_no,
+      row.employee_name,
+      row.department_name || '',
+      row.expected_work_days || 0,
+      row.work_days || 0,
+      row.approved_leave_days || 0,
+      row.actual_attendance_days || 0,
+      row.formatted_attendance_rate || '',
+      row.formatted_actual_attendance_rate || '',
+      row.late_count || 0,
+      row.late_grace_count || 0,
+      row.early_leave_count || 0,
+      row.formatted_late_rate || '',
+      row.leave_hours || 0,
+      row.overtime_hours || 0,
+      row.overtime_days || 0,
+    ])
+
+    downloadCsv(rows, headers, `出勤總報表_${summaryMonth}`)
+  }
+  // ========== 總報表函式結束 ==========
+
   async function handleCancelLeave(leaveId: number) {
     if (!currentUser) return
     const cancelReason = window.prompt(t(lang, '請輸入取消原因', 'Please enter cancellation reason', 'Vui lòng nhập lý do hủy đơn'))
@@ -2356,6 +2456,80 @@ function App() {
                   </>
                 )}
               </section>
+
+              {/* 新增：出勤總報表區塊 */}
+              <section className="card">
+                <h2>
+                  {currentUser?.system_role === 'hr' || currentUser?.system_role === 'general_manager'
+                    ? '人資出勤總報表'
+                    : currentUser?.system_role === 'manager'
+                      ? '主管團隊出勤總報表'
+                      : '個人出勤總報表'}
+                </h2>
+
+                <div className="toolbar" style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+                  <input
+                    type="month"
+                    value={summaryMonth}
+                    onChange={e => setSummaryMonth(e.target.value)}
+                  />
+                  <button type="button" onClick={loadAttendanceSummary} disabled={isLoadingSummary}>
+                    {isLoadingSummary ? '查詢中...' : '查詢總報表'}
+                  </button>
+                  <button type="button" onClick={exportAttendanceSummaryCsv}>
+                    匯出 CSV
+                  </button>
+                </div>
+
+                {summaryMessage && <div className="note-box">{summaryMessage}</div>}
+
+                {attendanceSummary.length === 0 ? (
+                  <p className="small">請選擇月份並點擊「查詢總報表」</p>
+                ) : (
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr>
+                          <th>員工編號</th>
+                          <th>姓名</th>
+                          <th>部門</th>
+                          <th>應出勤</th>
+                          <th>刷卡出勤</th>
+                          <th>核准請假天數</th>
+                          <th>實際出勤</th>
+                          <th>實際出勤率</th>
+                          <th>遲到</th>
+                          <th>10分鐘內遲到</th>
+                          <th>早退</th>
+                          <th>請假時數</th>
+                          <th>加班時數</th>
+                          <th>加班天數</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {attendanceSummary.map(row => (
+                          <tr key={row.employee_no}>
+                            <td>{row.employee_no}</td>
+                            <td>{row.employee_name}</td>
+                            <td>{row.department_name || '-'}</td>
+                            <td>{row.expected_work_days || 0}</td>
+                            <td>{row.work_days || 0}</td>
+                            <td>{row.approved_leave_days || 0}</td>
+                            <td>{row.actual_attendance_days || 0}</td>
+                            <td>{row.formatted_actual_attendance_rate || '-'}</td>
+                            <td>{row.late_count || 0}</td>
+                            <td>{row.late_grace_count || 0}</td>
+                            <td>{row.early_leave_count || 0}</td>
+                            <td>{row.leave_hours || 0}</td>
+                            <td>{row.overtime_hours || 0}</td>
+                            <td>{row.overtime_days || 0}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </section>
             </div>
           )}
 
@@ -2516,7 +2690,6 @@ function App() {
               <section id="hr-import-section" className="card result-card">
                 <h2>{t(lang, '人資倒資料區', 'HR Data Import', 'Nhập dữ liệu nhân sự')}</h2>
                 <div className="approval-search">
-                  {/* 1. 門禁 TXT 匯入 */}
                   <button
                     className="submit-btn"
                     onClick={() => txtFileInputRef.current?.click()}
@@ -2535,7 +2708,6 @@ function App() {
                     }}
                   />
 
-                  {/* 2. 加班 Excel 匯入（獨立） */}
                   <button
                     className="submit-btn"
                     onClick={() => overtimeHrFileInputRef.current?.click()}
@@ -2554,7 +2726,6 @@ function App() {
                     }}
                   />
 
-                  {/* 3. 員工卡號匯入 */}
                   <button
                     className="submit-btn"
                     onClick={() => cardFileInputRef.current?.click()}
