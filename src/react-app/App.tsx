@@ -2447,7 +2447,7 @@ function App() {
                                 <td style={{ border: '1px solid #ddd', padding: '8px' }} className={`status-${row.status}`}>
                                   {row.status}
                                 </td>
-                              </tr>
+                              <tr>
                             ))}
                           </tbody>
                         </table>
@@ -2457,7 +2457,7 @@ function App() {
                 )}
               </section>
 
-              {/* 新增：出勤總報表區塊 */}
+              {/* 新增：出勤總報表區塊（已補上 summary-table 類別） */}
               <section className="card">
                 <h2>
                   {currentUser?.system_role === 'hr' || currentUser?.system_role === 'general_manager'
@@ -2487,7 +2487,7 @@ function App() {
                   <p className="small">請選擇月份並點擊「查詢總報表」</p>
                 ) : (
                   <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <table className="summary-table">
                       <thead>
                         <tr>
                           <th>員工編號</th>
