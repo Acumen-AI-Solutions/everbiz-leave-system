@@ -1056,8 +1056,10 @@ function App() {
       if (!data.ok) {
         setImportTxtResult(data.message || '匯入失敗')
       } else {
-        setImportTxtResult(`成功 ${data.inserted} 筆，錯誤 ${data.errors?.length || 0} 筆${data.errors?.length ? '，詳情請看控制台' : ''}`)
-        if (data.errors && data.errors.length) console.warn(data.errors)
+        const errorText = data.errors?.length
+  ? `\n錯誤明細：\n${data.errors.join('\n')}`
+  : ''
+setImportTxtResult(`成功 ${data.inserted} 筆，錯誤 ${data.errors?.length || 0} 筆${errorText}`)
         if (activeRecordTab === 'attendance') await loadAttendance()
       }
     } catch (err) {
