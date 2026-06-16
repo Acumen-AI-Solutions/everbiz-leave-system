@@ -2447,7 +2447,7 @@ function App() {
                                 <td style={{ border: '1px solid #ddd', padding: '8px' }} className={`status-${row.status}`}>
                                   {row.status}
                                 </td>
-                              <tr>
+                              </tr>
                             ))}
                           </tbody>
                         </table>
