@@ -790,7 +790,8 @@ function App() {
     setOvertimeImportRows([])
   }
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  // ========== 整合點 1：修改後的 handleSubmit（已加入病假提示） ==========
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (isSubmitting) return
     const normalizedEmployeeNo = employeeNo.trim().toUpperCase()
@@ -847,6 +848,14 @@ function App() {
       })
       setReason('')
       setError('')
+
+      // ✅ 整合點：病假提示
+      const currentLeaveType = leaveTypeOptions.find(opt => opt.code === leaveType)
+      const displayName = currentLeaveType ? currentLeaveType.name_zh : leaveType
+      if (displayName.includes('病假') || displayName.includes('sick')) {
+        alert('病假申請已送出，系統會通知人資提醒繳交診斷書。')
+      }
+
       await loadMyLeavesSilent()
     } catch {
       setError(t(lang, '送出失敗，請確認後端 API 是否正常', 'Submission failed. Please check the backend API.', 'Gửi thất bại. Vui lòng kiểm tra API backend.'))
@@ -2076,7 +2085,8 @@ setImportTxtResult(`成功 ${data.inserted} 筆，錯誤 ${data.errors?.length |
               {hrEmployees.length === 0 ? (
                 <p className="small">{t(lang, '暫無員工資料', 'No employee data', 'Chưa có dữ liệu nhân viên')}</p>
               ) : (
-                <div className="approval-list" style={{ overflowX: 'auto' }}>
+                // ===== 整合點 2：替換為 employee-table-wrap =====
+                <div className="employee-table-wrap">
                   <table className="employee-table">
                     <thead>
                       <tr>
@@ -2115,6 +2125,7 @@ setImportTxtResult(`成功 ${data.inserted} 筆，錯誤 ${data.errors?.length |
                     </tbody>
                   </table>
                 </div>
+                // ===== 整合點 2 結束 =====
               )}
             </section>
           )}
