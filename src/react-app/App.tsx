@@ -1098,7 +1098,7 @@ function App() {
     }
   }
 
-  // 人資倒資料區：員工卡號匯入（CSV/Excel）
+  // 人資倒資料區：員工卡號匯入（優化版，使用 Map 預加載）
   async function handleCardImport(file: File) {
     if (!currentUser) return
     setImportingCards(true)
@@ -1138,6 +1138,18 @@ function App() {
         return
       }
 
+      // 🔥 性能優化：一次性獲取所有員工並建立 Map
+      const empRes = await fetch(`${API_BASE}/api/hr/employees?hr_no=${encodeURIComponent(currentUser.employee_no)}`)
+      const empData = await empRes.json()
+      if (!empData.ok) {
+        setImportCardResult('無法取得員工資料，請確認權限')
+        return
+      }
+      const employeeMap = new Map<string, FullEmployee>()
+      for (const emp of (empData.employees || [])) {
+        employeeMap.set(emp.employee_no, emp)
+      }
+
       let successCount = 0
       let failCount = 0
       const errors: string[] = []
@@ -1151,14 +1163,14 @@ function App() {
           failCount++
           continue
         }
-        const empRes = await fetch(`${API_BASE}/api/hr/employees?hr_no=${encodeURIComponent(currentUser.employee_no)}`)
-        const empData = await empRes.json()
-        const existingEmp = empData.employees?.find((e: any) => e.employee_no === employeeNo)
+
+        const existingEmp = employeeMap.get(employeeNo)
         if (!existingEmp) {
           errors.push(`第 ${i + 2} 行員工編號 ${employeeNo} 不存在`)
           failCount++
           continue
         }
+
         const payload = {
           hr_no: currentUser.employee_no,
           employee_no: existingEmp.employee_no,
@@ -1176,6 +1188,7 @@ function App() {
           is_active: existingEmp.is_active,
           card_no: cardNo
         }
+
         const res = await fetch(`${API_BASE}/api/hr/employee/upsert`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -2287,12 +2300,13 @@ function App() {
                                   {row.punch_fix_status || 'normal'}
                                 </td>
                                 <td style={{ border: '1px solid #ddd', padding: '8px' }}>
-                                  {row.punch_fix_status && row.punch_fix_status !== 'normal' && (
+                                  {/* 🔥 只有 late_grace 才顯示填寫原因按鈕 */}
+                                  {row.punch_fix_status === 'late_grace' && (
                                     <button
-                                      className="btn-danger"
+                                      className="btn-warning"
                                       onClick={() => submitExceptionReason(row)}
                                     >
-                                      {t(lang, '填寫異常原因', 'Fill Exception Reason', 'Điền lý do bất thường')}
+                                      {t(lang, '填寫原因', 'Fill Reason', 'Điền lý do')}
                                     </button>
                                   )}
                                 </td>
@@ -2330,7 +2344,9 @@ function App() {
                                 <td style={{ border: '1px solid #ddd', padding: '8px' }}>{row.work_date}</td>
                                 <td style={{ border: '1px solid #ddd', padding: '8px' }}>{row.exception_type}</td>
                                 <td style={{ border: '1px solid #ddd', padding: '8px' }}>{row.reason_text || '-'}</td>
-                                <td style={{ border: '1px solid #ddd', padding: '8px' }}>{row.status}</td>
+                                <td style={{ border: '1px solid #ddd', padding: '8px' }} className={`status-${row.status}`}>
+                                  {row.status}
+                                </td>
                               </tr>
                             ))}
                           </tbody>
