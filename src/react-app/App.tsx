@@ -2290,6 +2290,16 @@ setImportTxtResult(`成功 ${data.inserted} 筆，錯誤 ${data.errors?.length |
                     <div><span>{t(lang, '期間', 'Period', 'Thời gian')}</span><strong>{result.startDate} {result.startTime} ~ {result.endDate} {result.endTime}</strong></div>
                     <div><span>{t(lang, '時數', 'Hours', 'Số giờ')}</span><strong>{result.totalHours} {t(lang, '小時', 'hr(s)', 'giờ')}</strong></div>
                     <div><span>{t(lang, '目前審核主管', 'Current Approver', 'Người phê duyệt')}</span><strong>{approverDisplay(result.currentApproverNo, result.currentApproverName)}</strong></div>
+                    {result && getLeaveTypeDisplayName(result.leaveType).includes('病假') && (
+                   <button
+                    type="button"
+                    className="submit-btn"
+                    onClick={openMedicalEmail}
+                    style={{ marginTop: '12px' }}
+                   >
+                    寄診斷書照片
+                    </button>
+                    )}
                   </div>
                   <p className="small">
                     {result.totalHours > 24
