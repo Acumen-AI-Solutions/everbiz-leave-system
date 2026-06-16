@@ -790,7 +790,7 @@ function App() {
     setOvertimeImportRows([])
   }
 
-  // ========== 修改點 1：更新 handleSubmit 中的病假提示 ==========
+  // ========== 整合點 1：更新 handleSubmit 中的病假提示 ==========
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (isSubmitting) return
@@ -865,17 +865,35 @@ function App() {
     }
   }
 
-  // ========== 修改點 2：新增 openMedicalEmail 函數 ==========
- function openMedicalEmail() {
-  const subject = encodeURIComponent(`病假診斷書照片 - ${employeeName} ${employeeNo}`)
-  const body = encodeURIComponent(
-    `您好：\n\n我是 ${employeeName}（${employeeNo}）。\n我要補寄病假診斷書照片。\n\n請在此 Email 附上照片後寄出。\n\n謝謝。`
-  )
+  // ========== 修改點 2：最新版本 openMedicalEmail（支援手機與 Gmail 桌面） ==========
+  function openMedicalEmail() {
+    const subject = encodeURIComponent(
+      `病假診斷書照片 - ${employeeName} ${employeeNo}`
+    )
 
-  const mailUrl = `mailto:imd13@everbiz.com.tw?subject=${subject}&body=${body}`
+    const body = encodeURIComponent(
+      `您好：
 
-  window.open(mailUrl, '_blank')
-}
+我是 ${employeeName}（${employeeNo}）。
+
+請附上診斷書照片。
+
+謝謝。`
+    )
+
+    const isMobile =
+      /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+
+    if (isMobile) {
+      window.location.href =
+        `mailto:imd13@everbiz.com.tw?subject=${subject}&body=${body}`
+    } else {
+      window.open(
+        `https://mail.google.com/mail/?view=cm&fs=1&to=imd13@everbiz.com.tw&su=${subject}&body=${body}`,
+        '_blank'
+      )
+    }
+  }
 
   async function handlePunchSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
