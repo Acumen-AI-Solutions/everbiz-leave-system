@@ -473,6 +473,7 @@ function App() {
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([])
   const [attendanceMessage, setAttendanceMessage] = useState('')
   const [isLoadingAttendance, setIsLoadingAttendance] = useState(false)
+  const [attendanceFilterDate, setAttendanceFilterDate] = useState('')   // 新增
 
   const [hrLeaves, setHrLeaves] = useState<LeaveRecord[]>([])
   const [hrPunches, setHrPunches] = useState<PunchRecord[]>([])
@@ -2426,51 +2427,76 @@ setImportTxtResult(`成功 ${data.inserted} 筆，錯誤 ${data.errors?.length |
 
                 {activeRecordTab === 'attendance' && (
                   <>
-                    {/* 按鈕與 attendanceMessage 已刪除 */}
+                    <div className="toolbar" style={{ display: 'flex', gap: '8px', marginBottom: '16px', alignItems: 'center' }}>
+                      <input
+                        type="date"
+                        value={attendanceFilterDate}
+                        onChange={e => setAttendanceFilterDate(e.target.value)}
+                      />
+                      {attendanceFilterDate && (
+                        <button type="button" className="submit-btn" style={{ width: 'auto' }} onClick={() => setAttendanceFilterDate('')}>
+                          {t(lang, '清除日期', 'Clear Date', 'Xóa ngày')}
+                        </button>
+                      )}
+                    </div>
 
-                    {attendanceRecords.length === 0 ? (
-                      <p className="small">{t(lang, '目前沒有出勤紀錄。', 'No attendance records.', 'Không có bản ghi chấm công.')}</p>
-                    ) : (
-                      <div className="summary-table-wrap">
-                        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '700px' }}>
-                          <thead style={{ position: 'sticky', top: 0, zIndex: 3 }}>
-                            <tr>
-                              <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>{t(lang, '日期', 'Date', 'Ngày')}</th>
-                              <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>{t(lang, '上班', 'Clock-in', 'Giờ vào')}</th>
-                              <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>{t(lang, '下班', 'Clock-out', 'Giờ ra')}</th>
-                              <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>{t(lang, '請假時數', 'Leave Hours', 'Giờ nghỉ')}</th>
-                              <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>{t(lang, '加班時數', 'OT Hours', 'Giờ tăng ca')}</th>
-                              <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>{t(lang, '狀態', 'Status', 'Trạng thái')}</th>
-                              <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>{t(lang, '操作', 'Action', 'Hành động')}</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {attendanceRecords.map(row => (
-                              <tr key={row.id}>
-                                <td style={{ border: '1px solid #ddd', padding: '8px' }}>{row.work_date}</td>
-                                <td style={{ border: '1px solid #ddd', padding: '8px' }}>{row.first_punch_time || '-'}</td>
-                                <td style={{ border: '1px solid #ddd', padding: '8px' }}>{row.last_punch_time || '-'}</td>
-                                <td style={{ border: '1px solid #ddd', padding: '8px' }}>{row.leave_hours ?? '-'}</td>
-                                <td style={{ border: '1px solid #ddd', padding: '8px' }}>{row.overtime_hours ?? '-'}</td>
-                                <td className={row.punch_fix_status !== 'normal' ? 'danger-text' : ''} style={{ border: '1px solid #ddd', padding: '8px' }}>
-                                  {row.punch_fix_status || 'normal'}
-                                </td>
-                                <td style={{ border: '1px solid #ddd', padding: '8px' }}>
-                                  {row.punch_fix_status === 'late_grace' && (
-                                    <button
-                                      className="btn-warning"
-                                      onClick={() => submitExceptionReason(row)}
-                                    >
-                                      {t(lang, '填寫原因', 'Fill Reason', 'Điền lý do')}
-                                    </button>
-                                  )}
-                                </td>
+                    {(() => {
+                      const filteredAttendance = attendanceFilterDate
+                        ? attendanceRecords.filter(row => row.work_date === attendanceFilterDate)
+                        : attendanceRecords
+
+                      if (filteredAttendance.length === 0) {
+                        return (
+                          <p className="small">
+                            {attendanceFilterDate
+                              ? t(lang, '該日期沒有出勤紀錄。', 'No attendance records for this date.', 'Không có bản ghi chấm công cho ngày này.')
+                              : t(lang, '目前沒有出勤紀錄。', 'No attendance records.', 'Không có bản ghi chấm công.')}
+                          </p>
+                        )
+                      }
+
+                      return (
+                        <div className="summary-table-wrap">
+                          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '700px' }}>
+                            <thead style={{ position: 'sticky', top: 0, zIndex: 3 }}>
+                              <tr>
+                                <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>{t(lang, '日期', 'Date', 'Ngày')}</th>
+                                <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>{t(lang, '上班', 'Clock-in', 'Giờ vào')}</th>
+                                <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>{t(lang, '下班', 'Clock-out', 'Giờ ra')}</th>
+                                <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>{t(lang, '請假時數', 'Leave Hours', 'Giờ nghỉ')}</th>
+                                <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>{t(lang, '加班時數', 'OT Hours', 'Giờ tăng ca')}</th>
+                                <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>{t(lang, '狀態', 'Status', 'Trạng thái')}</th>
+                                <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>{t(lang, '操作', 'Action', 'Hành động')}</th>
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
+                            </thead>
+                            <tbody>
+                              {filteredAttendance.map(row => (
+                                <tr key={row.id}>
+                                  <td style={{ border: '1px solid #ddd', padding: '8px' }}>{row.work_date}</td>
+                                  <td style={{ border: '1px solid #ddd', padding: '8px' }}>{row.first_punch_time || '-'}</td>
+                                  <td style={{ border: '1px solid #ddd', padding: '8px' }}>{row.last_punch_time || '-'}</td>
+                                  <td style={{ border: '1px solid #ddd', padding: '8px' }}>{row.leave_hours ?? '-'}</td>
+                                  <td style={{ border: '1px solid #ddd', padding: '8px' }}>{row.overtime_hours ?? '-'}</td>
+                                  <td className={row.punch_fix_status !== 'normal' ? 'danger-text' : ''} style={{ border: '1px solid #ddd', padding: '8px' }}>
+                                    {row.punch_fix_status || 'normal'}
+                                  </td>
+                                  <td style={{ border: '1px solid #ddd', padding: '8px' }}>
+                                    {row.punch_fix_status === 'late_grace' && (
+                                      <button
+                                        className="btn-warning"
+                                        onClick={() => submitExceptionReason(row)}
+                                      >
+                                        {t(lang, '填寫原因', 'Fill Reason', 'Điền lý do')}
+                                      </button>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )
+                    })()}
 
                     <h3 style={{ marginTop: '24px' }}>{t(lang, '出勤異常報表', 'Attendance Exception Report', 'Báo cáo chấm công bất thường')}</h3>
                     {loadingExceptions ? (
@@ -2541,7 +2567,6 @@ setImportTxtResult(`成功 ${data.inserted} 筆，錯誤 ${data.errors?.length |
                   <p className="small">請選擇月份並點擊「查詢總報表」</p>
                 ) : (
                   <div className="summary-table-wrap-dual">
-                    {/* 表頭容器（水平滾動跟隨表體） */}
                     <div
                       ref={summaryHeaderRef}
                       style={{ overflowX: 'hidden' }}
@@ -2567,7 +2592,6 @@ setImportTxtResult(`成功 ${data.inserted} 筆，錯誤 ${data.errors?.length |
                         </thead>
                       </table>
                     </div>
-                    {/* 表體容器（可垂直及水平滾動） */}
                     <div
                       className="summary-table-body"
                       ref={summaryBodyRef}
