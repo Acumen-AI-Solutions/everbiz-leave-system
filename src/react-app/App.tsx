@@ -502,6 +502,10 @@ function App() {
   const overtimeHrFileInputRef = useRef<HTMLInputElement>(null)
   const cardFileInputRef = useRef<HTMLInputElement>(null)
 
+  // ===== 雙表格滾動同步用的 ref =====
+  const summaryHeaderRef = useRef<HTMLDivElement>(null)
+  const summaryBodyRef = useRef<HTMLDivElement>(null)
+
   const canApprove = !!currentUser
   const canViewHrReport =
     currentUser?.system_role === 'hr' ||
@@ -2537,29 +2541,42 @@ setImportTxtResult(`成功 ${data.inserted} 筆，錯誤 ${data.errors?.length |
                   <p className="small">請選擇月份並點擊「查詢總報表」</p>
                 ) : (
                   <div className="summary-table-wrap-dual">
-                    {/* 獨立表頭（固定） */}
-                    <table className="summary-table-header">
-                      <thead>
-                        <tr>
-                          <th>員工編號</th>
-                          <th>姓名</th>
-                          <th>部門</th>
-                          <th>應出勤</th>
-                          <th>刷卡出勤</th>
-                          <th>核准請假天數</th>
-                          <th>實際出勤</th>
-                          <th>實際出勤率</th>
-                          <th>遲到</th>
-                          <th>10分鐘內遲到</th>
-                          <th>早退</th>
-                          <th>請假時數</th>
-                          <th>加班時數</th>
-                          <th>加班天數</th>
-                        </tr>
-                      </thead>
-                    </table>
-                    {/* 可滾動的表體 */}
-                    <div className="summary-table-body">
+                    {/* 表頭容器（水平滾動跟隨表體） */}
+                    <div
+                      ref={summaryHeaderRef}
+                      style={{ overflowX: 'hidden' }}
+                    >
+                      <table className="summary-table-header">
+                        <thead>
+                          <tr>
+                            <th>員工編號</th>
+                            <th>姓名</th>
+                            <th>部門</th>
+                            <th>應出勤</th>
+                            <th>刷卡出勤</th>
+                            <th>核准請假天數</th>
+                            <th>實際出勤</th>
+                            <th>實際出勤率</th>
+                            <th>遲到</th>
+                            <th>10分鐘內遲到</th>
+                            <th>早退</th>
+                            <th>請假時數</th>
+                            <th>加班時數</th>
+                            <th>加班天數</th>
+                          </tr>
+                        </thead>
+                      </table>
+                    </div>
+                    {/* 表體容器（可垂直及水平滾動） */}
+                    <div
+                      className="summary-table-body"
+                      ref={summaryBodyRef}
+                      onScroll={() => {
+                        if (summaryHeaderRef.current && summaryBodyRef.current) {
+                          summaryHeaderRef.current.scrollLeft = summaryBodyRef.current.scrollLeft
+                        }
+                      }}
+                    >
                       <table className="summary-table">
                         <tbody>
                           {attendanceSummary.map(row => (
