@@ -184,8 +184,7 @@ body {
   border-radius: 24px;
   padding: 28px;
   box-shadow: 0 12px 35px rgba(15,23,42,0.08);
-  overflow-x: auto;
-  overflow-y: visible;
+ 
 }
 
 .card h2 {
@@ -722,6 +721,8 @@ input[readonly] {
 .summary-table-wrap {
   overflow-x: auto;
   overflow-y: visible;
+  max-height: 520px;   /* ← 加這行，限制高度 */
+  overflow-y: auto;    /* ← 改成 auto，讓垂直也能捲 */
 }
 
 .summary-table-wrap table thead th {
