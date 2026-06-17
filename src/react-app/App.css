@@ -184,7 +184,7 @@ body {
   border-radius: 24px;
   padding: 28px;
   box-shadow: 0 12px 35px rgba(15,23,42,0.08);
-  /* overflow 已移除，讓 sticky 正常運作 */
+  /* overflow 已移除，確保 sticky 正常運作 */
 }
 
 .card h2 {
@@ -717,16 +717,38 @@ input[readonly] {
   background: #f1f5f9;
 }
 
-/* ===== 雙表格方案：固定表頭 + 滾動表體（總報表專用） ===== */
+/* ===== 出勤紀錄與異常報表共用容器（sticky） ===== */
 .summary-table-wrap {
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 520px;
+}
+
+.summary-table-wrap table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+}
+
+.summary-table-wrap thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.summary-table-wrap thead th {
+  background: #f0fdfa;
+  box-shadow: 0 2px 3px rgba(0,0,0,0.06);
+}
+
+/* ===== 總報表雙表格方案（固定表頭 + 滾動表體） ===== */
+.summary-table-wrap-dual {
   position: relative;
   border: 1px solid #e5e7eb;
   border-radius: 14px;
-  overflow: hidden;
 }
 
-/* 表頭表格：固定在頂部，不滾動 */
-.summary-table-header {
+.summary-table-wrap-dual .summary-table-header {
   width: 100%;
   border-collapse: collapse;
   border: none;
@@ -734,7 +756,7 @@ input[readonly] {
   margin: 0;
 }
 
-.summary-table-header thead th {
+.summary-table-wrap-dual .summary-table-header thead th {
   background: #f0fdfa;
   color: #115e59;
   padding: 13px 12px;
@@ -743,54 +765,56 @@ input[readonly] {
   border-bottom: 2px solid #d1d5db;
 }
 
-.summary-table-header thead th:first-child,
-.summary-table-header thead th:nth-child(2) {
+.summary-table-wrap-dual .summary-table-header thead th:first-child,
+.summary-table-wrap-dual .summary-table-header thead th:nth-child(2) {
   text-align: left;
 }
 
-/* 表體容器：可滾動 */
-.summary-table-body {
+.summary-table-wrap-dual .summary-table-body {
   overflow-y: auto;
   max-height: 420px;
 }
 
-.summary-table-body table {
+.summary-table-wrap-dual .summary-table-body table {
   width: 100%;
   border-collapse: collapse;
   border: none;
   border-radius: 0;
 }
 
-.summary-table-body td {
+.summary-table-wrap-dual .summary-table-body td {
   padding: 13px 12px;
   text-align: center;
   white-space: nowrap;
   border-bottom: 1px solid #e5e7eb;
 }
 
-.summary-table-body td:first-child,
-.summary-table-body td:nth-child(2) {
+.summary-table-wrap-dual .summary-table-body td:first-child,
+.summary-table-wrap-dual .summary-table-body td:nth-child(2) {
   text-align: left;
 }
 
 /* 讓表頭與表體欄寬一致 */
-.summary-table-header,
-.summary-table-body table {
+.summary-table-wrap-dual .summary-table-header,
+.summary-table-wrap-dual .summary-table-body table {
   table-layout: fixed;
 }
 
 /* ===== 捲軸永遠顯示（美觀） ===== */
 .summary-table-wrap::-webkit-scrollbar,
-.employee-table-wrap::-webkit-scrollbar {
+.employee-table-wrap::-webkit-scrollbar,
+.summary-table-wrap-dual .summary-table-body::-webkit-scrollbar {
   height: 8px;
   width: 8px;
 }
 .summary-table-wrap::-webkit-scrollbar-thumb,
-.employee-table-wrap::-webkit-scrollbar-thumb {
+.employee-table-wrap::-webkit-scrollbar-thumb,
+.summary-table-wrap-dual .summary-table-body::-webkit-scrollbar-thumb {
   background: #94a3b8;
   border-radius: 4px;
 }
 .summary-table-wrap::-webkit-scrollbar-track,
-.employee-table-wrap::-webkit-scrollbar-track {
+.employee-table-wrap::-webkit-scrollbar-track,
+.summary-table-wrap-dual .summary-table-body::-webkit-scrollbar-track {
   background: #f1f5f9;
 }
