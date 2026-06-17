@@ -794,10 +794,46 @@ input[readonly] {
   text-align: left;
 }
 
-/* 讓表頭與表體欄寬一致 */
+/* ===== 修正：讓表頭與表體欄寬一致（使用固定寬度） ===== */
 .summary-table-wrap-dual .summary-table-header,
 .summary-table-wrap-dual .summary-table-body table {
   table-layout: fixed;
+  /* width: 100% 已移除，改為 auto，讓表格根據內容與固定寬度調整 */
+}
+
+/* 各欄獨立寬度設定 */
+.summary-table-wrap-dual .summary-table-header th:nth-child(1),
+.summary-table-wrap-dual .summary-table-body td:nth-child(1) { width: 90px; }
+.summary-table-wrap-dual .summary-table-header th:nth-child(2),
+.summary-table-wrap-dual .summary-table-body td:nth-child(2) { width: 90px; }
+.summary-table-wrap-dual .summary-table-header th:nth-child(3),
+.summary-table-wrap-dual .summary-table-body td:nth-child(3) { width: 130px; }
+.summary-table-wrap-dual .summary-table-header th:nth-child(4),
+.summary-table-wrap-dual .summary-table-body td:nth-child(4) { width: 80px; }
+.summary-table-wrap-dual .summary-table-header th:nth-child(5),
+.summary-table-wrap-dual .summary-table-body td:nth-child(5) { width: 80px; }
+.summary-table-wrap-dual .summary-table-header th:nth-child(6),
+.summary-table-wrap-dual .summary-table-body td:nth-child(6) { width: 110px; }
+.summary-table-wrap-dual .summary-table-header th:nth-child(7),
+.summary-table-wrap-dual .summary-table-body td:nth-child(7) { width: 90px; }
+.summary-table-wrap-dual .summary-table-header th:nth-child(8),
+.summary-table-wrap-dual .summary-table-body td:nth-child(8) { width: 100px; }
+.summary-table-wrap-dual .summary-table-header th:nth-child(9),
+.summary-table-wrap-dual .summary-table-body td:nth-child(9) { width: 70px; }
+.summary-table-wrap-dual .summary-table-header th:nth-child(10),
+.summary-table-wrap-dual .summary-table-body td:nth-child(10) { width: 120px; }
+.summary-table-wrap-dual .summary-table-header th:nth-child(11),
+.summary-table-wrap-dual .summary-table-body td:nth-child(11) { width: 70px; }
+.summary-table-wrap-dual .summary-table-header th:nth-child(12),
+.summary-table-wrap-dual .summary-table-body td:nth-child(12) { width: 90px; }
+.summary-table-wrap-dual .summary-table-header th:nth-child(13),
+.summary-table-wrap-dual .summary-table-body td:nth-child(13) { width: 90px; }
+.summary-table-wrap-dual .summary-table-header th:nth-child(14),
+.summary-table-wrap-dual .summary-table-body td:nth-child(14) { width: 90px; }
+
+.summary-table-wrap-dual .summary-table-header th,
+.summary-table-wrap-dual .summary-table-body td {
+  box-sizing: border-box;
 }
 
 /* ===== 捲軸永遠顯示（美觀） ===== */
