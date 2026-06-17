@@ -1523,7 +1523,7 @@ setImportTxtResult(`成功 ${data.inserted} 筆，錯誤 ${data.errors?.length |
     }
   }
 
-  // 載入出勤異常報表
+  // ===== 修改點：出勤異常報表只顯示最近一個月 =====
   async function loadAttendanceExceptions() {
     if (!currentUser) return
     setLoadingExceptions(true)
@@ -1531,7 +1531,12 @@ setImportTxtResult(`成功 ${data.inserted} 筆，錯誤 ${data.errors?.length |
       const res = await fetch(`${API_BASE}/api/attendance/exceptions?viewer_no=${encodeURIComponent(currentUser.employee_no)}`)
       const data = await res.json()
       if (data.ok) {
-        setAttendanceExceptions(data.exceptions || [])
+        const oneMonthAgo = new Date()
+        oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1)
+        const filtered = (data.exceptions || []).filter((ex: AttendanceException) =>
+          new Date(ex.work_date) >= oneMonthAgo
+        )
+        setAttendanceExceptions(filtered)
       } else {
         setAttendanceExceptions([])
       }
@@ -2420,15 +2425,15 @@ setImportTxtResult(`成功 ${data.inserted} 筆，錯誤 ${data.errors?.length |
 
                 {activeRecordTab === 'attendance' && (
                   <>
-                    <button className="submit-btn" onClick={loadAttendance} disabled={isLoadingAttendance}>
-                      {isLoadingAttendance ? t(lang, '查詢中...', 'Loading...', 'Đang tải...') : t(lang, '查詢出勤紀錄', 'Load Attendance', 'Tải chấm công')}
-                    </button>
-                    {attendanceMessage && <div className="note-box">{attendanceMessage}</div>}
+                    {/* ===== 修改點 1：移除「查詢出勤紀錄」按鈕與訊息 ===== */}
+                    {/* 按鈕與 attendanceMessage 已刪除 */}
+
                     {attendanceRecords.length === 0 ? (
                       <p className="small">{t(lang, '目前沒有出勤紀錄。', 'No attendance records.', 'Không có bản ghi chấm công.')}</p>
                     ) : (
-                      <div style={{ overflowX: 'auto' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      // ===== 修改點 3：出勤表格使用 summary-table-wrap 並加 minWidth =====
+                      <div className="summary-table-wrap">
+                        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '700px' }}>
                           <thead>
                             <tr>
                               <th style={{ border: '1px solid #ddd', padding: '8px' }}>{t(lang, '日期', 'Date', 'Ngày')}</th>
