@@ -184,7 +184,7 @@ body {
   border-radius: 24px;
   padding: 28px;
   box-shadow: 0 12px 35px rgba(15,23,42,0.08);
-  /* overflow 已移除，讓 sticky 可作用 */
+  /* overflow 已移除，讓 sticky 正常運作 */
 }
 
 .card h2 {
@@ -717,41 +717,12 @@ input[readonly] {
   background: #f1f5f9;
 }
 
-/* ===== 出勤紀錄與總報表共用容器（舊版 sticky，保留但可能被覆蓋） ===== */
-.summary-table-wrap {
-  overflow-x: auto;
-  overflow-y: auto;
-  max-height: 520px;
-}
-
-/* 強制表格使用分離邊框，避免 sticky 失效 */
-.summary-table-wrap table {
-  border-collapse: separate;
-  border-spacing: 0;
-  width: 100%;
-}
-
-/* 將 sticky 設定在 thead 上，並用 !important 確保優先 */
-.summary-table-wrap thead {
-  position: -webkit-sticky !important;
-  position: sticky !important;
-  top: 0 !important;
-  z-index: 10 !important;
-}
-
-/* 表頭背景色與陰影（使用 !important 覆蓋內聯） */
-.summary-table-wrap thead th {
-  background: #f0fdfa !important;
-  box-shadow: 0 2px 3px rgba(0,0,0,0.06);
-}
-
-/* ===== 雙表格方案：固定表頭 + 滾動表體（專用於總報表，優先使用） ===== */
+/* ===== 雙表格方案：固定表頭 + 滾動表體（總報表專用） ===== */
 .summary-table-wrap {
   position: relative;
   border: 1px solid #e5e7eb;
   border-radius: 14px;
   overflow: hidden;
-  max-height: none; /* 取消舊版高度限制，由內部 .summary-table-body 控制 */
 }
 
 /* 表頭表格：固定在頂部，不滾動 */
@@ -780,7 +751,7 @@ input[readonly] {
 /* 表體容器：可滾動 */
 .summary-table-body {
   overflow-y: auto;
-  max-height: 420px;  /* 可自行調整高度 */
+  max-height: 420px;
 }
 
 .summary-table-body table {
@@ -802,8 +773,8 @@ input[readonly] {
   text-align: left;
 }
 
-/* 讓表頭與表體欄寬一致（使用 fixed 強制等寬） */
-.summary-table-header table,
+/* 讓表頭與表體欄寬一致 */
+.summary-table-header,
 .summary-table-body table {
   table-layout: fixed;
 }
@@ -812,7 +783,7 @@ input[readonly] {
 .summary-table-wrap::-webkit-scrollbar,
 .employee-table-wrap::-webkit-scrollbar {
   height: 8px;
-  width: 8px;   
+  width: 8px;
 }
 .summary-table-wrap::-webkit-scrollbar-thumb,
 .employee-table-wrap::-webkit-scrollbar-thumb {
