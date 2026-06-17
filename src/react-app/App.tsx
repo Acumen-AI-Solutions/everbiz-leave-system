@@ -2481,8 +2481,8 @@ setImportTxtResult(`成功 ${data.inserted} 筆，錯誤 ${data.errors?.length |
                     ) : attendanceExceptions.length === 0 ? (
                       <p className="small">{t(lang, '目前沒有出勤異常紀錄。', 'No attendance exceptions found.', 'Không có bản ghi chấm công bất thường.')}</p>
                     ) : (
-                      <div style={{ overflowX: 'auto' }}>
-                        <table className="report-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <div className="summary-table-wrap">
+                      <table className="summary-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
                           <thead>
                             <tr>
                               <th style={{ border: '1px solid #ddd', padding: '8px' }}>{t(lang, '員工編號', 'Employee No.', 'Mã NV')}</th>
@@ -2543,8 +2543,8 @@ setImportTxtResult(`成功 ${data.inserted} 筆，錯誤 ${data.errors?.length |
                 {attendanceSummary.length === 0 ? (
                   <p className="small">請選擇月份並點擊「查詢總報表」</p>
                 ) : (
-                  <div style={{ overflowX: 'auto' }}>
-                    <table className="summary-table">
+                  <div className="summary-table-wrap">
+                  <table className="summary-table">
                       <thead>
                         <tr>
                           <th>員工編號</th>
