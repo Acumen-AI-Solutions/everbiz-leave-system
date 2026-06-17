@@ -602,7 +602,7 @@ input[readonly] {
   font-weight: 700;
 }
 
-/* ========== 新增：出勤總報表樣式 ========== */
+/* ========== 出勤總報表樣式 ========== */
 .toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -671,7 +671,8 @@ input[readonly] {
     margin-bottom: 10px;
   }
 }
-/* ===== 員工表格固定表頭與首欄（新增） ===== */
+
+/* ===== 員工表格固定表頭與首欄 ===== */
 .employee-table-wrap {
   max-height: 620px;
   overflow: auto;
@@ -705,7 +706,7 @@ input[readonly] {
   background: #f0fdfa;
 }
 
-/* 視覺優化 */
+/* 視覺優化（員工表格） */
 .employee-table th,
 .employee-table td {
   padding: 10px 14px;
@@ -714,5 +715,34 @@ input[readonly] {
   white-space: nowrap;
 }
 .employee-table th {
+  background: #f1f5f9;
+}
+
+/* ===== 新增：出勤紀錄與總報表共用容器 ===== */
+.summary-table-wrap {
+  overflow-x: auto;
+  overflow-y: visible;
+}
+
+.summary-table-wrap table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: #f0fdfa;
+  box-shadow: 0 2px 3px rgba(0,0,0,0.06);
+}
+
+/* ===== 捲軸永遠顯示（美觀） ===== */
+.summary-table-wrap::-webkit-scrollbar,
+.employee-table-wrap::-webkit-scrollbar {
+  height: 8px;
+}
+.summary-table-wrap::-webkit-scrollbar-thumb,
+.employee-table-wrap::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 4px;
+}
+.summary-table-wrap::-webkit-scrollbar-track,
+.employee-table-wrap::-webkit-scrollbar-track {
   background: #f1f5f9;
 }
