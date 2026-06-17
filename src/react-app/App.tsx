@@ -2536,7 +2536,7 @@ setImportTxtResult(`成功 ${data.inserted} 筆，錯誤 ${data.errors?.length |
                 {attendanceSummary.length === 0 ? (
                   <p className="small">請選擇月份並點擊「查詢總報表」</p>
                 ) : (
-                  <div className="summary-table-wrap">
+                  <div className="summary-table-wrap-dual">
                     {/* 獨立表頭（固定） */}
                     <table className="summary-table-header">
                       <thead>
