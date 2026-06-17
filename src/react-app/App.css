@@ -720,9 +720,8 @@ input[readonly] {
 /* ===== 新增：出勤紀錄與總報表共用容器 ===== */
 .summary-table-wrap {
   overflow-x: auto;
-  overflow-y: visible;
-  max-height: 520px;   /* ← 加這行，限制高度 */
-  overflow-y: auto;    /* ← 改成 auto，讓垂直也能捲 */
+  overflow-y: auto;
+  max-height: 520px;
 }
 
 .summary-table-wrap table thead th {
@@ -737,6 +736,7 @@ input[readonly] {
 .summary-table-wrap::-webkit-scrollbar,
 .employee-table-wrap::-webkit-scrollbar {
   height: 8px;
+  width: 8px;   
 }
 .summary-table-wrap::-webkit-scrollbar-thumb,
 .employee-table-wrap::-webkit-scrollbar-thumb {
