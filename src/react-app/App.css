@@ -184,7 +184,7 @@ body {
   border-radius: 24px;
   padding: 28px;
   box-shadow: 0 12px 35px rgba(15,23,42,0.08);
- 
+  /* overflow 屬性已移除，確保 sticky 可在內部正常運作 */
 }
 
 .card h2 {
@@ -717,18 +717,31 @@ input[readonly] {
   background: #f1f5f9;
 }
 
-/* ===== 新增：出勤紀錄與總報表共用容器 ===== */
+/* ===== 出勤紀錄與總報表共用容器（修正 sticky） ===== */
 .summary-table-wrap {
   overflow-x: auto;
   overflow-y: auto;
   max-height: 520px;
 }
 
-.summary-table-wrap table thead th {
-  position: sticky;
-  top: 0;
-  z-index: 3;
-  background: #f0fdfa;
+/* 強制表格使用分離邊框，避免 sticky 失效 */
+.summary-table-wrap table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+}
+
+/* 將 sticky 設定在 thead 上，並用 !important 確保優先 */
+.summary-table-wrap thead {
+  position: -webkit-sticky !important;
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 10 !important;
+}
+
+/* 表頭背景色與陰影（使用 !important 覆蓋內聯） */
+.summary-table-wrap thead th {
+  background: #f0fdfa !important;
   box-shadow: 0 2px 3px rgba(0,0,0,0.06);
 }
 
