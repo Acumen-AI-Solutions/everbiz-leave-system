@@ -2434,15 +2434,16 @@ setImportTxtResult(`成功 ${data.inserted} 筆，錯誤 ${data.errors?.length |
                       // ===== 修改點 3：出勤表格使用 summary-table-wrap 並加 minWidth =====
                       <div className="summary-table-wrap">
                         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '700px' }}>
-                          <thead>
+                          {/* ===== 修改點 4：thead 固定 + 背景色 ===== */}
+                          <thead style={{ position: 'sticky', top: 0, zIndex: 3 }}>
                             <tr>
-                              <th style={{ border: '1px solid #ddd', padding: '8px' }}>{t(lang, '日期', 'Date', 'Ngày')}</th>
-                              <th style={{ border: '1px solid #ddd', padding: '8px' }}>{t(lang, '上班', 'Clock-in', 'Giờ vào')}</th>
-                              <th style={{ border: '1px solid #ddd', padding: '8px' }}>{t(lang, '下班', 'Clock-out', 'Giờ ra')}</th>
-                              <th style={{ border: '1px solid #ddd', padding: '8px' }}>{t(lang, '請假時數', 'Leave Hours', 'Giờ nghỉ')}</th>
-                              <th style={{ border: '1px solid #ddd', padding: '8px' }}>{t(lang, '加班時數', 'OT Hours', 'Giờ tăng ca')}</th>
-                              <th style={{ border: '1px solid #ddd', padding: '8px' }}>{t(lang, '狀態', 'Status', 'Trạng thái')}</th>
-                              <th style={{ border: '1px solid #ddd', padding: '8px' }}>{t(lang, '操作', 'Action', 'Hành động')}</th>
+                              <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>{t(lang, '日期', 'Date', 'Ngày')}</th>
+                              <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>{t(lang, '上班', 'Clock-in', 'Giờ vào')}</th>
+                              <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>{t(lang, '下班', 'Clock-out', 'Giờ ra')}</th>
+                              <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>{t(lang, '請假時數', 'Leave Hours', 'Giờ nghỉ')}</th>
+                              <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>{t(lang, '加班時數', 'OT Hours', 'Giờ tăng ca')}</th>
+                              <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>{t(lang, '狀態', 'Status', 'Trạng thái')}</th>
+                              <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>{t(lang, '操作', 'Action', 'Hành động')}</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -2482,15 +2483,16 @@ setImportTxtResult(`成功 ${data.inserted} 筆，錯誤 ${data.errors?.length |
                       <p className="small">{t(lang, '目前沒有出勤異常紀錄。', 'No attendance exceptions found.', 'Không có bản ghi chấm công bất thường.')}</p>
                     ) : (
                       <div className="summary-table-wrap">
-                      <table className="summary-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
-                          <thead>
+                        <table className="summary-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                          {/* ===== 修改點 4：thead 固定 + 背景色 ===== */}
+                          <thead style={{ position: 'sticky', top: 0, zIndex: 3 }}>
                             <tr>
-                              <th style={{ border: '1px solid #ddd', padding: '8px' }}>{t(lang, '員工編號', 'Employee No.', 'Mã NV')}</th>
-                              <th style={{ border: '1px solid #ddd', padding: '8px' }}>{t(lang, '姓名', 'Name', 'Tên')}</th>
-                              <th style={{ border: '1px solid #ddd', padding: '8px' }}>{t(lang, '日期', 'Date', 'Ngày')}</th>
-                              <th style={{ border: '1px solid #ddd', padding: '8px' }}>{t(lang, '異常類型', 'Exception Type', 'Loại bất thường')}</th>
-                              <th style={{ border: '1px solid #ddd', padding: '8px' }}>{t(lang, '原因', 'Reason', 'Lý do')}</th>
-                              <th style={{ border: '1px solid #ddd', padding: '8px' }}>{t(lang, '狀態', 'Status', 'Trạng thái')}</th>
+                              <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>{t(lang, '員工編號', 'Employee No.', 'Mã NV')}</th>
+                              <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>{t(lang, '姓名', 'Name', 'Tên')}</th>
+                              <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>{t(lang, '日期', 'Date', 'Ngày')}</th>
+                              <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>{t(lang, '異常類型', 'Exception Type', 'Loại bất thường')}</th>
+                              <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>{t(lang, '原因', 'Reason', 'Lý do')}</th>
+                              <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>{t(lang, '狀態', 'Status', 'Trạng thái')}</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -2544,23 +2546,24 @@ setImportTxtResult(`成功 ${data.inserted} 筆，錯誤 ${data.errors?.length |
                   <p className="small">請選擇月份並點擊「查詢總報表」</p>
                 ) : (
                   <div className="summary-table-wrap">
-                  <table className="summary-table">
-                      <thead>
+                    <table className="summary-table">
+                      {/* ===== 修改點 4：thead 固定 + 背景色 ===== */}
+                      <thead style={{ position: 'sticky', top: 0, zIndex: 3 }}>
                         <tr>
-                          <th>員工編號</th>
-                          <th>姓名</th>
-                          <th>部門</th>
-                          <th>應出勤</th>
-                          <th>刷卡出勤</th>
-                          <th>核准請假天數</th>
-                          <th>實際出勤</th>
-                          <th>實際出勤率</th>
-                          <th>遲到</th>
-                          <th>10分鐘內遲到</th>
-                          <th>早退</th>
-                          <th>請假時數</th>
-                          <th>加班時數</th>
-                          <th>加班天數</th>
+                          <th style={{ background: '#f0fdfa' }}>員工編號</th>
+                          <th style={{ background: '#f0fdfa' }}>姓名</th>
+                          <th style={{ background: '#f0fdfa' }}>部門</th>
+                          <th style={{ background: '#f0fdfa' }}>應出勤</th>
+                          <th style={{ background: '#f0fdfa' }}>刷卡出勤</th>
+                          <th style={{ background: '#f0fdfa' }}>核准請假天數</th>
+                          <th style={{ background: '#f0fdfa' }}>實際出勤</th>
+                          <th style={{ background: '#f0fdfa' }}>實際出勤率</th>
+                          <th style={{ background: '#f0fdfa' }}>遲到</th>
+                          <th style={{ background: '#f0fdfa' }}>10分鐘內遲到</th>
+                          <th style={{ background: '#f0fdfa' }}>早退</th>
+                          <th style={{ background: '#f0fdfa' }}>請假時數</th>
+                          <th style={{ background: '#f0fdfa' }}>加班時數</th>
+                          <th style={{ background: '#f0fdfa' }}>加班天數</th>
                         </tr>
                       </thead>
                       <tbody>
