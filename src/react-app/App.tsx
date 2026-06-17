@@ -473,7 +473,7 @@ function App() {
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([])
   const [attendanceMessage, setAttendanceMessage] = useState('')
   const [isLoadingAttendance, setIsLoadingAttendance] = useState(false)
-  const [attendanceFilterDate, setAttendanceFilterDate] = useState('')   // 新增
+  const [attendanceFilterDate, setAttendanceFilterDate] = useState('')
 
   const [hrLeaves, setHrLeaves] = useState<LeaveRecord[]>([])
   const [hrPunches, setHrPunches] = useState<PunchRecord[]>([])
@@ -481,17 +481,14 @@ function App() {
   const [hrMessage, setHrMessage] = useState('')
   const [isLoadingHrLeaves, setIsLoadingHrLeaves] = useState(false)
 
-  // 出勤異常報表狀態
   const [attendanceExceptions, setAttendanceExceptions] = useState<AttendanceException[]>([])
   const [loadingExceptions, setLoadingExceptions] = useState(false)
 
-  // 出勤總報表狀態
   const [summaryMonth, setSummaryMonth] = useState('2026-06')
   const [attendanceSummary, setAttendanceSummary] = useState<AttendanceSummary[]>([])
   const [summaryMessage, setSummaryMessage] = useState('')
   const [isLoadingSummary, setIsLoadingSummary] = useState(false)
 
-  // 人資倒資料區狀態
   const [importTxtResult, setImportTxtResult] = useState('')
   const [importOvertimeResult, setImportOvertimeResult] = useState('')
   const [importCardResult, setImportCardResult] = useState('')
@@ -503,7 +500,6 @@ function App() {
   const overtimeHrFileInputRef = useRef<HTMLInputElement>(null)
   const cardFileInputRef = useRef<HTMLInputElement>(null)
 
-  // ===== 雙表格滾動同步用的 ref =====
   const summaryHeaderRef = useRef<HTMLDivElement>(null)
   const summaryBodyRef = useRef<HTMLDivElement>(null)
 
@@ -669,7 +665,6 @@ function App() {
     }
   }
 
-  // 員工列表（申請頁面右側）根據角色過濾
   async function loadEmployees() {
     try {
       const res = await fetch(`${API_BASE}/api/employees`)
@@ -682,14 +677,11 @@ function App() {
         }
         const role = currentUser.system_role
         if (role === 'hr' || role === 'general_manager') {
-          // HR/總經理：看全部
           setEmployeeList(allEmployees)
         } else if (role === 'manager') {
-          // 主管：只看直屬下屬
           const filtered = allEmployees.filter((emp: Employee) => emp.direct_manager_no === currentUser.employee_no)
           setEmployeeList(filtered)
         } else {
-          // 一般員工：只看自己
           const filtered = allEmployees.filter((emp: Employee) => emp.employee_no === currentUser.employee_no)
           setEmployeeList(filtered)
         }
@@ -795,7 +787,6 @@ function App() {
     setOvertimeImportRows([])
   }
 
-  // ========== 整合點 1：更新 handleSubmit 中的病假提示 ==========
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (isSubmitting) return
@@ -853,14 +844,11 @@ function App() {
       })
       setReason('')
       setError('')
-
-      // ✅ 修改點 1：更新病假提示訊息
       const currentLeaveType = leaveTypeOptions.find(opt => opt.code === leaveType)
       const displayName = currentLeaveType ? currentLeaveType.name_zh : leaveType
       if (displayName.includes('病假') || displayName.includes('sick')) {
         alert('病假申請已送出，請用 Email 附上診斷書照片寄到 imd13@everbiz.com.tw。')
       }
-
       await loadMyLeavesSilent()
     } catch {
       setError(t(lang, '送出失敗，請確認後端 API 是否正常', 'Submission failed. Please check the backend API.', 'Gửi thất bại. Vui lòng kiểm tra API backend.'))
@@ -870,12 +858,10 @@ function App() {
     }
   }
 
-  // ========== 修改點 2：最新版本 openMedicalEmail（支援手機與 Gmail 桌面） ==========
   function openMedicalEmail() {
     const subject = encodeURIComponent(
       `病假診斷書照片 - ${employeeName} ${employeeNo}`
     )
-
     const body = encodeURIComponent(
       `您好：
 
@@ -885,10 +871,8 @@ function App() {
 
 謝謝。`
     )
-
     const isMobile =
       /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
-
     if (isMobile) {
       window.location.href =
         `mailto:imd13@everbiz.com.tw?subject=${subject}&body=${body}`
@@ -969,7 +953,6 @@ function App() {
     }
   }
 
-  // 加班 Excel 匯入（在申請區使用）
   function handleOvertimeExcelUpload(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     if (!file) return
@@ -1082,7 +1065,6 @@ function App() {
     }
   }
 
-  // 人資倒資料區：門禁 TXT 匯入
   async function handleTxtImport(file: File) {
     if (!currentUser) return
     setImportingTxt(true)
@@ -1115,7 +1097,6 @@ setImportTxtResult(`成功 ${data.inserted} 筆，錯誤 ${data.errors?.length |
     }
   }
 
-  // 人資倒資料區：加班 Excel 獨立匯入
   async function handleOvertimeHrImport(file: File) {
     if (!currentUser) return
     setImportingOvertimeHr(true)
@@ -1169,7 +1150,6 @@ setImportTxtResult(`成功 ${data.inserted} 筆，錯誤 ${data.errors?.length |
     }
   }
 
-  // 人資倒資料區：員工卡號匯入（優化版，使用 Map 預加載）
   async function handleCardImport(file: File) {
     if (!currentUser) return
     setImportingCards(true)
@@ -1209,7 +1189,6 @@ setImportTxtResult(`成功 ${data.inserted} 筆，錯誤 ${data.errors?.length |
         return
       }
 
-      // 🔥 性能優化：一次性獲取所有員工並建立 Map
       const empRes = await fetch(`${API_BASE}/api/hr/employees?hr_no=${encodeURIComponent(currentUser.employee_no)}`)
       const empData = await empRes.json()
       if (!empData.ok) {
@@ -1505,7 +1484,6 @@ setImportTxtResult(`成功 ${data.inserted} 筆，錯誤 ${data.errors?.length |
     }
   }
 
-  // 提交異常原因
   async function submitExceptionReason(row: AttendanceRecord) {
     if (!currentUser) return
     const reason = window.prompt('請輸入異常原因，例如：車輛故障、身體不適、交通因素')
@@ -1528,7 +1506,6 @@ setImportTxtResult(`成功 ${data.inserted} 筆，錯誤 ${data.errors?.length |
     }
   }
 
-  // ===== 修改點：出勤異常報表只顯示最近一個月 =====
   async function loadAttendanceExceptions() {
     if (!currentUser) return
     setLoadingExceptions(true)
@@ -1566,7 +1543,6 @@ setImportTxtResult(`成功 ${data.inserted} 筆，錯誤 ${data.errors?.length |
         return
       }
       setAttendanceRecords(data.attendance || [])
-      // 自動載入異常報表
       await loadAttendanceExceptions()
       setAttendanceMessage(t(lang, `已載入 ${data.attendance?.length || 0} 筆出勤紀錄`, `Loaded ${data.attendance?.length || 0} attendance records`, `Đã tải ${data.attendance?.length || 0} bản ghi chấm công`))
     } catch {
@@ -1577,16 +1553,12 @@ setImportTxtResult(`成功 ${data.inserted} 筆，錯誤 ${data.errors?.length |
     }
   }
 
-  // ========== 新增：出勤總報表查詢 ==========
   async function loadAttendanceSummary() {
     if (!currentUser) return
-
     setIsLoadingSummary(true)
     setSummaryMessage('查詢總報表中...')
-
     try {
       let url = ''
-
       if (currentUser.system_role === 'hr' || currentUser.system_role === 'general_manager') {
         url = `${API_BASE}/api/hr/attendance-summary?hr_no=${encodeURIComponent(currentUser.employee_no)}&month=${summaryMonth}`
       } else if (currentUser.system_role === 'manager') {
@@ -1594,16 +1566,13 @@ setImportTxtResult(`成功 ${data.inserted} 筆，錯誤 ${data.errors?.length |
       } else {
         url = `${API_BASE}/api/report/my-summary?employee_no=${encodeURIComponent(currentUser.employee_no)}&month=${summaryMonth}`
       }
-
       const res = await fetch(url)
       const data = await res.json()
-
       if (!data.ok) {
         setSummaryMessage(data.message || '總報表查詢失敗')
         setAttendanceSummary([])
         return
       }
-
       const rows = Array.isArray(data.data) ? data.data : [data.data]
       setAttendanceSummary(rows)
       setSummaryMessage(`已載入 ${rows.length} 筆總報表`)
@@ -1620,7 +1589,6 @@ setImportTxtResult(`成功 ${data.inserted} 筆，錯誤 ${data.errors?.length |
       setSummaryMessage('目前沒有總報表資料可以匯出')
       return
     }
-
     const headers = [
       '員工編號', '姓名', '部門',
       '應出勤天數', '刷卡出勤天數', '核准請假天數', '實際出勤天數',
@@ -1628,7 +1596,6 @@ setImportTxtResult(`成功 ${data.inserted} 筆，錯誤 ${data.errors?.length |
       '遲到次數', '10分鐘內遲到', '早退次數', '遲到率',
       '請假時數', '加班時數', '加班天數',
     ]
-
     const rows = attendanceSummary.map(row => [
       row.employee_no,
       row.employee_name,
@@ -1647,10 +1614,8 @@ setImportTxtResult(`成功 ${data.inserted} 筆，錯誤 ${data.errors?.length |
       row.overtime_hours || 0,
       row.overtime_days || 0,
     ])
-
     downloadCsv(rows, headers, `出勤總報表_${summaryMonth}`)
   }
-  // ========== 總報表函式結束 ==========
 
   async function handleCancelLeave(leaveId: number) {
     if (!currentUser) return
@@ -2460,18 +2425,40 @@ setImportTxtResult(`成功 ${data.inserted} 筆，錯誤 ${data.errors?.length |
                           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '700px' }}>
                             <thead style={{ position: 'sticky', top: 0, zIndex: 3 }}>
                               <tr>
-                                <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>{t(lang, '日期', 'Date', 'Ngày')}</th>
-                                <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>{t(lang, '上班', 'Clock-in', 'Giờ vào')}</th>
-                                <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>{t(lang, '下班', 'Clock-out', 'Giờ ra')}</th>
-                                <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>{t(lang, '請假時數', 'Leave Hours', 'Giờ nghỉ')}</th>
-                                <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>{t(lang, '加班時數', 'OT Hours', 'Giờ tăng ca')}</th>
-                                <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>{t(lang, '狀態', 'Status', 'Trạng thái')}</th>
-                                <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>{t(lang, '操作', 'Action', 'Hành động')}</th>
+                                <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>
+                                  {t(lang, '員工編號', 'Employee No.', 'Mã NV')}
+                                </th>
+                                <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>
+                                  {t(lang, '姓名', 'Name', 'Tên')}
+                                </th>
+                                <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>
+                                  {t(lang, '日期', 'Date', 'Ngày')}
+                                </th>
+                                <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>
+                                  {t(lang, '上班', 'Clock-in', 'Giờ vào')}
+                                </th>
+                                <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>
+                                  {t(lang, '下班', 'Clock-out', 'Giờ ra')}
+                                </th>
+                                <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>
+                                  {t(lang, '請假時數', 'Leave Hours', 'Giờ nghỉ')}
+                                </th>
+                                <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>
+                                  {t(lang, '加班時數', 'OT Hours', 'Giờ tăng ca')}
+                                </th>
+                                <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>
+                                  {t(lang, '狀態', 'Status', 'Trạng thái')}
+                                </th>
+                                <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>
+                                  {t(lang, '操作', 'Action', 'Hành động')}
+                                </th>
                               </tr>
                             </thead>
                             <tbody>
                               {filteredAttendance.map(row => (
                                 <tr key={row.id}>
+                                  <td style={{ border: '1px solid #ddd', padding: '8px' }}>{row.employee_no}</td>
+                                  <td style={{ border: '1px solid #ddd', padding: '8px' }}>{row.employee_name}</td>
                                   <td style={{ border: '1px solid #ddd', padding: '8px' }}>{row.work_date}</td>
                                   <td style={{ border: '1px solid #ddd', padding: '8px' }}>{row.first_punch_time || '-'}</td>
                                   <td style={{ border: '1px solid #ddd', padding: '8px' }}>{row.last_punch_time || '-'}</td>
@@ -2508,12 +2495,24 @@ setImportTxtResult(`成功 ${data.inserted} 筆，錯誤 ${data.errors?.length |
                         <table className="summary-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
                           <thead style={{ position: 'sticky', top: 0, zIndex: 3 }}>
                             <tr>
-                              <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>{t(lang, '員工編號', 'Employee No.', 'Mã NV')}</th>
-                              <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>{t(lang, '姓名', 'Name', 'Tên')}</th>
-                              <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>{t(lang, '日期', 'Date', 'Ngày')}</th>
-                              <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>{t(lang, '異常類型', 'Exception Type', 'Loại bất thường')}</th>
-                              <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>{t(lang, '原因', 'Reason', 'Lý do')}</th>
-                              <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>{t(lang, '狀態', 'Status', 'Trạng thái')}</th>
+                              <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>
+                                {t(lang, '員工編號', 'Employee No.', 'Mã NV')}
+                              </th>
+                              <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>
+                                {t(lang, '姓名', 'Name', 'Tên')}
+                              </th>
+                              <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>
+                                {t(lang, '日期', 'Date', 'Ngày')}
+                              </th>
+                              <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>
+                                {t(lang, '異常類型', 'Exception Type', 'Loại bất thường')}
+                              </th>
+                              <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>
+                                {t(lang, '原因', 'Reason', 'Lý do')}
+                              </th>
+                              <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>
+                                {t(lang, '狀態', 'Status', 'Trạng thái')}
+                              </th>
                             </tr>
                           </thead>
                           <tbody>
@@ -2537,7 +2536,6 @@ setImportTxtResult(`成功 ${data.inserted} 筆，錯誤 ${data.errors?.length |
                 )}
               </section>
 
-              {/* 總報表區塊（雙表格） */}
               <section className="card">
                 <h2>
                   {currentUser?.system_role === 'hr' || currentUser?.system_role === 'general_manager'
