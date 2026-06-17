@@ -2120,7 +2120,6 @@ setImportTxtResult(`成功 ${data.inserted} 筆，錯誤 ${data.errors?.length |
               {hrEmployees.length === 0 ? (
                 <p className="small">{t(lang, '暫無員工資料', 'No employee data', 'Chưa có dữ liệu nhân viên')}</p>
               ) : (
-                // ===== 整合點 2：替換為 employee-table-wrap =====
                 <div className="employee-table-wrap">
                   <table className="employee-table">
                     <thead>
@@ -2160,7 +2159,6 @@ setImportTxtResult(`成功 ${data.inserted} 筆，錯誤 ${data.errors?.length |
                     </tbody>
                   </table>
                 </div>
-                // ===== 整合點 2 結束 =====
               )}
             </section>
           )}
@@ -2323,7 +2321,6 @@ setImportTxtResult(`成功 ${data.inserted} 筆，錯誤 ${data.errors?.length |
                       : t(lang, '假單已送出，將由主管審核。', 'Leave request submitted and will be reviewed by your supervisor.', 'Đơn nghỉ đã được gửi và sẽ được quản lý xem xét.')}
                   </p>
 
-                  {/* ========== 修改點 3：病假按鈕（正確位置，只在病假時顯示） ========== */}
                   {getLeaveTypeDisplayName(result.leaveType).includes('病假') && (
                     <div style={{ marginTop: '16px' }}>
                       <button type="button" className="submit-btn" onClick={openMedicalEmail}>
@@ -2425,16 +2422,13 @@ setImportTxtResult(`成功 ${data.inserted} 筆，錯誤 ${data.errors?.length |
 
                 {activeRecordTab === 'attendance' && (
                   <>
-                    {/* ===== 修改點 1：移除「查詢出勤紀錄」按鈕與訊息 ===== */}
                     {/* 按鈕與 attendanceMessage 已刪除 */}
 
                     {attendanceRecords.length === 0 ? (
                       <p className="small">{t(lang, '目前沒有出勤紀錄。', 'No attendance records.', 'Không có bản ghi chấm công.')}</p>
                     ) : (
-                      // ===== 修改點 3：出勤表格使用 summary-table-wrap 並加 minWidth =====
                       <div className="summary-table-wrap">
                         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '700px' }}>
-                          {/* ===== 修改點 4：thead 固定 + 背景色 ===== */}
                           <thead style={{ position: 'sticky', top: 0, zIndex: 3 }}>
                             <tr>
                               <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>{t(lang, '日期', 'Date', 'Ngày')}</th>
@@ -2458,7 +2452,6 @@ setImportTxtResult(`成功 ${data.inserted} 筆，錯誤 ${data.errors?.length |
                                   {row.punch_fix_status || 'normal'}
                                 </td>
                                 <td style={{ border: '1px solid #ddd', padding: '8px' }}>
-                                  {/* 🔥 只有 late_grace 才顯示填寫原因按鈕 */}
                                   {row.punch_fix_status === 'late_grace' && (
                                     <button
                                       className="btn-warning"
@@ -2475,7 +2468,6 @@ setImportTxtResult(`成功 ${data.inserted} 筆，錯誤 ${data.errors?.length |
                       </div>
                     )}
 
-                    {/* 出勤異常報表表格 */}
                     <h3 style={{ marginTop: '24px' }}>{t(lang, '出勤異常報表', 'Attendance Exception Report', 'Báo cáo chấm công bất thường')}</h3>
                     {loadingExceptions ? (
                       <p>{t(lang, '載入中...', 'Loading...', 'Đang tải...')}</p>
@@ -2484,7 +2476,6 @@ setImportTxtResult(`成功 ${data.inserted} 筆，錯誤 ${data.errors?.length |
                     ) : (
                       <div className="summary-table-wrap">
                         <table className="summary-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
-                          {/* ===== 修改點 4：thead 固定 + 背景色 ===== */}
                           <thead style={{ position: 'sticky', top: 0, zIndex: 3 }}>
                             <tr>
                               <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0fdfa' }}>{t(lang, '員工編號', 'Employee No.', 'Mã NV')}</th>
@@ -2516,7 +2507,7 @@ setImportTxtResult(`成功 ${data.inserted} 筆，錯誤 ${data.errors?.length |
                 )}
               </section>
 
-              {/* 新增：出勤總報表區塊（已補上 summary-table 類別） */}
+              {/* 總報表區塊（雙表格） */}
               <section className="card">
                 <h2>
                   {currentUser?.system_role === 'hr' || currentUser?.system_role === 'general_manager'
@@ -2546,47 +2537,52 @@ setImportTxtResult(`成功 ${data.inserted} 筆，錯誤 ${data.errors?.length |
                   <p className="small">請選擇月份並點擊「查詢總報表」</p>
                 ) : (
                   <div className="summary-table-wrap">
-                    <table className="summary-table">
-                      {/* ===== 修改點 4：thead 固定 + 背景色 ===== */}
-                      <thead style={{ position: 'sticky', top: 0, zIndex: 3 }}>
+                    {/* 獨立表頭（固定） */}
+                    <table className="summary-table-header">
+                      <thead>
                         <tr>
-                          <th style={{ background: '#f0fdfa' }}>員工編號</th>
-                          <th style={{ background: '#f0fdfa' }}>姓名</th>
-                          <th style={{ background: '#f0fdfa' }}>部門</th>
-                          <th style={{ background: '#f0fdfa' }}>應出勤</th>
-                          <th style={{ background: '#f0fdfa' }}>刷卡出勤</th>
-                          <th style={{ background: '#f0fdfa' }}>核准請假天數</th>
-                          <th style={{ background: '#f0fdfa' }}>實際出勤</th>
-                          <th style={{ background: '#f0fdfa' }}>實際出勤率</th>
-                          <th style={{ background: '#f0fdfa' }}>遲到</th>
-                          <th style={{ background: '#f0fdfa' }}>10分鐘內遲到</th>
-                          <th style={{ background: '#f0fdfa' }}>早退</th>
-                          <th style={{ background: '#f0fdfa' }}>請假時數</th>
-                          <th style={{ background: '#f0fdfa' }}>加班時數</th>
-                          <th style={{ background: '#f0fdfa' }}>加班天數</th>
+                          <th>員工編號</th>
+                          <th>姓名</th>
+                          <th>部門</th>
+                          <th>應出勤</th>
+                          <th>刷卡出勤</th>
+                          <th>核准請假天數</th>
+                          <th>實際出勤</th>
+                          <th>實際出勤率</th>
+                          <th>遲到</th>
+                          <th>10分鐘內遲到</th>
+                          <th>早退</th>
+                          <th>請假時數</th>
+                          <th>加班時數</th>
+                          <th>加班天數</th>
                         </tr>
                       </thead>
-                      <tbody>
-                        {attendanceSummary.map(row => (
-                          <tr key={row.employee_no}>
-                            <td>{row.employee_no}</td>
-                            <td>{row.employee_name}</td>
-                            <td>{row.department_name || '-'}</td>
-                            <td>{row.expected_work_days || 0}</td>
-                            <td>{row.work_days || 0}</td>
-                            <td>{row.approved_leave_days || 0}</td>
-                            <td>{row.actual_attendance_days || 0}</td>
-                            <td>{row.formatted_actual_attendance_rate || '-'}</td>
-                            <td>{row.late_count || 0}</td>
-                            <td>{row.late_grace_count || 0}</td>
-                            <td>{row.early_leave_count || 0}</td>
-                            <td>{row.leave_hours || 0}</td>
-                            <td>{row.overtime_hours || 0}</td>
-                            <td>{row.overtime_days || 0}</td>
-                          </tr>
-                        ))}
-                      </tbody>
                     </table>
+                    {/* 可滾動的表體 */}
+                    <div className="summary-table-body">
+                      <table className="summary-table">
+                        <tbody>
+                          {attendanceSummary.map(row => (
+                            <tr key={row.employee_no}>
+                              <td>{row.employee_no}</td>
+                              <td>{row.employee_name}</td>
+                              <td>{row.department_name || '-'}</td>
+                              <td>{row.expected_work_days || 0}</td>
+                              <td>{row.work_days || 0}</td>
+                              <td>{row.approved_leave_days || 0}</td>
+                              <td>{row.actual_attendance_days || 0}</td>
+                              <td>{row.formatted_actual_attendance_rate || '-'}</td>
+                              <td>{row.late_count || 0}</td>
+                              <td>{row.late_grace_count || 0}</td>
+                              <td>{row.early_leave_count || 0}</td>
+                              <td>{row.leave_hours || 0}</td>
+                              <td>{row.overtime_hours || 0}</td>
+                              <td>{row.overtime_days || 0}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 )}
               </section>
