@@ -884,6 +884,7 @@ function App() {
     setAnniversaryBalance(null)
   }
 
+  // ==================== 修正後的 handleSubmit ====================
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (isSubmitting) return
@@ -904,8 +905,17 @@ function App() {
       return
     }
 
-    // 特休餘額驗證
-    if (leaveType === 'annual' && annualBalance) {
+    // ========== 特休餘額驗證 ==========
+    if (leaveType === 'annual') {
+      if (!annualBalance) {
+        setError(t(lang,
+          '無法確認特休餘額（員工尚未設定到職日），請聯絡人資設定後再申請',
+          'Cannot verify annual leave balance (hire date not set). Please contact HR.',
+          'Không thể xác minh số ngày phép năm (chưa thiết lập ngày vào làm). Vui lòng liên hệ HR.'
+        ))
+        setResult(null)
+        return
+      }
       const requestedDays = totalHours / 8
       if (requestedDays > annualBalance.remaining_days) {
         setError(t(lang,
@@ -917,8 +927,18 @@ function App() {
         return
       }
     }
-    // 補休餘額驗證
-    if (leaveType === 'comp' && compBalance) {
+
+    // ========== 補休餘額驗證 ==========
+    if (leaveType === 'comp') {
+      if (!compBalance) {
+        setError(t(lang,
+          '無法確認補休餘額，請稍後再試或聯絡人資',
+          'Cannot verify comp leave balance. Please contact HR.',
+          'Không thể xác minh số giờ nghỉ bù. Vui lòng liên hệ HR.'
+        ))
+        setResult(null)
+        return
+      }
       if (totalHours > compBalance.remaining_hours) {
         setError(t(lang,
           `補休餘額不足，剩餘 ${compBalance.remaining_hours.toFixed(1)} 小時，本次申請 ${totalHours.toFixed(1)} 小時`,
@@ -929,8 +949,18 @@ function App() {
         return
       }
     }
-    // 週年制假別（事假/病假/生理假）驗證
-    if (['personal', 'sick', 'physio'].includes(leaveType) && anniversaryBalance) {
+
+    // ========== 週年制假別（事假/病假/生理假）餘額驗證 ==========
+    if (['personal', 'sick', 'physio'].includes(leaveType)) {
+      if (!anniversaryBalance) {
+        setError(t(lang,
+          '無法確認此假別餘額（員工尚未設定到職日），請聯絡人資設定後再申請',
+          'Cannot verify leave balance (hire date not set). Please contact HR.',
+          'Không thể xác minh số ngày nghỉ còn lại (chưa thiết lập ngày vào làm). Vui lòng liên hệ HR.'
+        ))
+        setResult(null)
+        return
+      }
       const requestedDays = totalHours / 8
       if (requestedDays > anniversaryBalance.remaining_days) {
         setError(t(lang,
@@ -943,6 +973,7 @@ function App() {
       }
     }
 
+    // 超過三天提醒
     if (totalHours > 24) {
       const confirmMsg = t(lang,
         '您申請的請假時數超過三天，主管核准後將再送董事長審核，確定送出嗎？',
@@ -951,6 +982,7 @@ function App() {
       )
       if (!window.confirm(confirmMsg)) return
     }
+
     setIsSubmitting(true)
     setError('')
     try {
