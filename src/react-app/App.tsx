@@ -215,6 +215,7 @@ type AnnualLeaveBalance = {
   remaining_days: number
   months_worked: number
   hire_date: string
+  period: { startDate: string; endDate: string }
 }
 
 type CompBalance = {
@@ -594,7 +595,7 @@ function App() {
     return found.name_vi
   }
 
-  // 載入特休餘額
+  // 載入特休餘額（曆年制）
   async function loadAnnualBalance() {
     if (!currentUser) return
     setAnnualBalanceLoading(true)
@@ -884,7 +885,7 @@ function App() {
     setAnniversaryBalance(null)
   }
 
-  // ==================== 修正後的 handleSubmit（含強制餘額檢查） ====================
+  // ==================== handleSubmit（含特休整天驗證） ====================
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (isSubmitting) return
@@ -905,8 +906,18 @@ function App() {
       return
     }
 
-    // ========== 特休餘額驗證 ==========
+    // ========== 特休驗證（曆年制 + 整天限制） ==========
     if (leaveType === 'annual') {
+      // 特休只能整天（8的倍數）
+      if (totalHours % 8 !== 0) {
+        setError(t(lang,
+          '特休僅能以「天」為單位申請（需為 8 小時的整數倍），請確認日期區間',
+          'Annual leave must be requested in full-day units (multiples of 8 hours).',
+          'Phép năm phải đăng ký theo ngày đầy đủ (số nguyên lần 8 giờ).'
+        ))
+        setResult(null)
+        return
+      }
       if (!annualBalance) {
         setError(t(lang,
           '無法確認特休餘額（員工尚未設定到職日），請聯絡人資設定後再申請',
@@ -2054,6 +2065,8 @@ function App() {
     setHrMessage(t(lang, `已匯出 ${overtimeData.length} 筆加班報表`, `Exported ${overtimeData.length} overtime record(s)`, `Đã xuất ${overtimeData.length} bản ghi`))
   }
 
+  // ==================== useEffect 區塊 ====================
+  // 1. 載入員工、假別等
   useEffect(() => {
     if (!currentUser) return
     loadEmployees()
@@ -2066,7 +2079,7 @@ function App() {
     }
   }, [currentUser])
 
-  // 設定預設假別（僅當 leaveType 尚未設定或不存在於清單時）
+  // 2. 設定預設 leaveType
   useEffect(() => {
     if (leaveTypeOptions.length > 0) {
       const exists = leaveTypeOptions.some(opt => opt.code === leaveType)
@@ -2076,7 +2089,7 @@ function App() {
     }
   }, [leaveTypeOptions, leaveType])
 
-  // ===== 新增：自動載入對應餘額（無論如何設定 leaveType） =====
+  // ===== 新增：自動載入餘額 =====
   useEffect(() => {
     if (!currentUser || !leaveType) return
     setAnnualBalance(null)
@@ -2086,8 +2099,8 @@ function App() {
     else if (leaveType === 'comp') loadCompBalance()
     else if (['personal', 'sick', 'physio'].includes(leaveType)) loadAnniversaryBalance(leaveType)
   }, [leaveType, currentUser])
-  // ===== 新增結束 =====
 
+  // 3. 載入待審核
   useEffect(() => {
     if (currentUser?.employee_no) {
       setApproverNo(currentUser.employee_no)
@@ -2394,7 +2407,7 @@ function App() {
                         <input value={employeeName} readOnly placeholder={t(lang, '姓名', 'Name', 'Tên')} />
                         <select
                           value={leaveType}
-                          onChange={e => setLeaveType(e.target.value)}  // 簡化，僅更新狀態
+                          onChange={e => setLeaveType(e.target.value)} // 僅更新狀態，查詢由 useEffect 處理
                         >
                           {leaveTypeOptions.map(item => (
                             <option key={item.code} value={item.code}>
@@ -2422,6 +2435,7 @@ function App() {
                             ) : annualBalance ? (
                               <>
                                 <div>📅 到職日：{annualBalance.hire_date}（年資 {annualBalance.months_worked} 個月）</div>
+                                <div>📅 計算週期：{annualBalance.period.startDate} ~ {annualBalance.period.endDate}</div>
                                 <div>🎯 今年應得特休：<strong>{annualBalance.annual_days} 天</strong></div>
                                 <div>✅ 已使用：{annualBalance.used_days.toFixed(1)} 天（{annualBalance.used_hours} 小時）</div>
                                 <div style={{ color: annualBalance.remaining_days <= 0 ? '#dc2626' : '#16a34a' }}>
@@ -2474,17 +2488,76 @@ function App() {
                             )}
                           </div>
                         )}
-                        <div className="two">
-                          <input type="date" value={startDate} onChange={e => { setStartDate(e.target.value); setTotalHours(calculateLeaveHours(e.target.value, startTime, endDate, endTime)) }} />
-                          <select value={startTime} onChange={e => { setStartTime(e.target.value); setTotalHours(calculateLeaveHours(startDate, e.target.value, endDate, endTime)) }}>{timeOptions.map(t => <option key={t} value={t}>{t}</option>)}</select>
-                        </div>
-                        <div className="two">
-                          <input type="date" value={endDate} onChange={e => { setEndDate(e.target.value); setTotalHours(calculateLeaveHours(startDate, startTime, e.target.value, endTime)) }} />
-                          <select value={endTime} onChange={e => { setEndTime(e.target.value); setTotalHours(calculateLeaveHours(startDate, startTime, endDate, e.target.value)) }}>{timeOptions.map(t => <option key={t} value={t}>{t}</option>)}</select>
-                        </div>
+
+                        {/* ===== 日期時間選擇（特休強制全天） ===== */}
+                        {leaveType === 'annual' ? (
+                          <>
+                            <div className="two">
+                              <input type="date" value={startDate} onChange={e => {
+                                const newStart = e.target.value
+                                setStartDate(newStart)
+                                setStartTime('08:00')
+                                setEndTime('17:00')
+                                setTotalHours(calculateLeaveHours(newStart, '08:00', endDate, '17:00'))
+                              }} />
+                              <input value="08:00（全天）" readOnly style={{ background: '#f3f4f6', color: '#888' }} />
+                            </div>
+                            <div className="two">
+                              <input type="date" value={endDate} onChange={e => {
+                                const newEnd = e.target.value
+                                setEndDate(newEnd)
+                                setStartTime('08:00')
+                                setEndTime('17:00')
+                                setTotalHours(calculateLeaveHours(startDate, '08:00', newEnd, '17:00'))
+                              }} />
+                              <input value="17:00（全天）" readOnly style={{ background: '#f3f4f6', color: '#888' }} />
+                            </div>
+                            <p className="small" style={{ color: '#888' }}>
+                              {t(lang, '特休僅能以「天」為單位申請，系統將自動計算整天時數', 'Annual leave can only be requested in full days.', 'Phép năm chỉ có thể đăng ký theo ngày đầy đủ.')}
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <div className="two">
+                              <input type="date" value={startDate} onChange={e => { setStartDate(e.target.value); setTotalHours(calculateLeaveHours(e.target.value, startTime, endDate, endTime)) }} />
+                              <select value={startTime} onChange={e => { setStartTime(e.target.value); setTotalHours(calculateLeaveHours(startDate, e.target.value, endDate, endTime)) }}>{timeOptions.map(t => <option key={t} value={t}>{t}</option>)}</select>
+                            </div>
+                            <div className="two">
+                              <input type="date" value={endDate} onChange={e => { setEndDate(e.target.value); setTotalHours(calculateLeaveHours(startDate, startTime, e.target.value, endTime)) }} />
+                              <select value={endTime} onChange={e => { setEndTime(e.target.value); setTotalHours(calculateLeaveHours(startDate, startTime, endDate, e.target.value)) }}>{timeOptions.map(t => <option key={t} value={t}>{t}</option>)}</select>
+                            </div>
+                          </>
+                        )}
+
                         <div className="note-box">{t(lang, `請假時數：${totalHours} 小時`, `Leave hours: ${totalHours} hr(s)`, `Số giờ nghỉ: ${totalHours} giờ`)}</div>
                         <textarea rows={5} value={reason} onChange={e => setReason(e.target.value)} placeholder={t(lang, '請假原因', 'Reason for leave', 'Lý do nghỉ phép')} />
-                        <button className="submit-btn" type="submit" disabled={isSubmitting}>{isSubmitting ? t(lang, '送出中...', 'Submitting...', 'Đang gửi...') : t(lang, '送出假單', 'Submit Leave Request', 'Gửi đơn nghỉ phép')}</button>
+
+                        {/* ===== 醒目紅色錯誤框（按鈕正上方） ===== */}
+                        {error && (
+                          <div
+                            style={{
+                              marginTop: '8px',
+                              marginBottom: '8px',
+                              padding: '12px 16px',
+                              backgroundColor: '#fef2f2',
+                              border: '2px solid #dc2626',
+                              borderRadius: '8px',
+                              color: '#991b1b',
+                              fontWeight: 'bold',
+                              fontSize: '14px',
+                              display: 'flex',
+                              alignItems: 'flex-start',
+                              gap: '8px'
+                            }}
+                          >
+                            <span style={{ fontSize: '18px', lineHeight: '1' }}>⚠️</span>
+                            <span>{error}</span>
+                          </div>
+                        )}
+
+                        <button className="submit-btn" type="submit" disabled={isSubmitting}>
+                          {isSubmitting ? t(lang, '送出中...', 'Submitting...', 'Đang gửi...') : t(lang, '送出假單', 'Submit Leave Request', 'Gửi đơn nghỉ phép')}
+                        </button>
                       </form>
                     </>
                   )}
