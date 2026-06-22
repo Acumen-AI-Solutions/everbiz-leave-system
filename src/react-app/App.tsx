@@ -884,7 +884,7 @@ function App() {
     setAnniversaryBalance(null)
   }
 
-  // ==================== 修正後的 handleSubmit ====================
+  // ==================== 修正後的 handleSubmit（含強制餘額檢查） ====================
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (isSubmitting) return
@@ -2066,6 +2066,7 @@ function App() {
     }
   }, [currentUser])
 
+  // 設定預設假別（僅當 leaveType 尚未設定或不存在於清單時）
   useEffect(() => {
     if (leaveTypeOptions.length > 0) {
       const exists = leaveTypeOptions.some(opt => opt.code === leaveType)
@@ -2074,6 +2075,18 @@ function App() {
       }
     }
   }, [leaveTypeOptions, leaveType])
+
+  // ===== 新增：自動載入對應餘額（無論如何設定 leaveType） =====
+  useEffect(() => {
+    if (!currentUser || !leaveType) return
+    setAnnualBalance(null)
+    setCompBalance(null)
+    setAnniversaryBalance(null)
+    if (leaveType === 'annual') loadAnnualBalance()
+    else if (leaveType === 'comp') loadCompBalance()
+    else if (['personal', 'sick', 'physio'].includes(leaveType)) loadAnniversaryBalance(leaveType)
+  }, [leaveType, currentUser])
+  // ===== 新增結束 =====
 
   useEffect(() => {
     if (currentUser?.employee_no) {
@@ -2381,16 +2394,7 @@ function App() {
                         <input value={employeeName} readOnly placeholder={t(lang, '姓名', 'Name', 'Tên')} />
                         <select
                           value={leaveType}
-                          onChange={e => {
-                            const val = e.target.value
-                            setLeaveType(val)
-                            setAnnualBalance(null)
-                            setCompBalance(null)
-                            setAnniversaryBalance(null)
-                            if (val === 'annual') loadAnnualBalance()
-                            else if (val === 'comp') loadCompBalance()
-                            else if (['personal', 'sick', 'physio'].includes(val)) loadAnniversaryBalance(val)
-                          }}
+                          onChange={e => setLeaveType(e.target.value)}  // 簡化，僅更新狀態
                         >
                           {leaveTypeOptions.map(item => (
                             <option key={item.code} value={item.code}>
