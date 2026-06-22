@@ -224,8 +224,18 @@ type CompBalance = {
   remaining_days: number
 }
 
+type AnniversaryBalance = {
+  leave_type: string
+  limit_days: number
+  used_hours: number
+  used_days: number
+  remaining_days: number
+  remaining_hours: number
+  period: { startDate: string; endDate: string }
+}
+
 type FormType = 'leave' | 'punch' | 'overtime'
-type SectionType = 'form' | 'approvals' | 'hr' | 'employees'
+type SectionType = 'form' | 'approvals' | 'hr' | 'employees' | 'leave-rules'
 type RecordTab = 'leave' | 'punch' | 'overtime' | 'attendance'
 type Lang = 'zh' | 'en' | 'vi'
 
@@ -518,6 +528,8 @@ function App() {
   const [annualBalanceLoading, setAnnualBalanceLoading] = useState(false)
   const [compBalance, setCompBalance] = useState<CompBalance | null>(null)
   const [compBalanceLoading, setCompBalanceLoading] = useState(false)
+  const [anniversaryBalance, setAnniversaryBalance] = useState<AnniversaryBalance | null>(null)
+  const [anniversaryBalanceLoading, setAnniversaryBalanceLoading] = useState(false)
 
   const [importTxtResult, setImportTxtResult] = useState('')
   const [importOvertimeResult, setImportOvertimeResult] = useState('')
@@ -612,6 +624,22 @@ function App() {
       setCompBalance(null)
     } finally {
       setCompBalanceLoading(false)
+    }
+  }
+
+  // 載入週年制假別餘額（事假/病假/生理假）
+  async function loadAnniversaryBalance(leaveTypeCode: string) {
+    if (!currentUser) return
+    setAnniversaryBalanceLoading(true)
+    try {
+      const res = await fetch(`${API_BASE}/api/leave/anniversary-balance?employee_no=${encodeURIComponent(currentUser.employee_no)}&leave_type=${leaveTypeCode}`)
+      const data = await res.json()
+      if (data.ok) setAnniversaryBalance(data)
+      else setAnniversaryBalance(null)
+    } catch {
+      setAnniversaryBalance(null)
+    } finally {
+      setAnniversaryBalanceLoading(false)
     }
   }
 
@@ -853,6 +881,7 @@ function App() {
     setOvertimeImportRows([])
     setAnnualBalance(null)
     setCompBalance(null)
+    setAnniversaryBalance(null)
   }
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -895,6 +924,19 @@ function App() {
           `補休餘額不足，剩餘 ${compBalance.remaining_hours.toFixed(1)} 小時，本次申請 ${totalHours.toFixed(1)} 小時`,
           `Insufficient comp leave. Remaining: ${compBalance.remaining_hours.toFixed(1)} hr(s), Requested: ${totalHours.toFixed(1)} hr(s)`,
           `Số giờ nghỉ bù không đủ. Còn lại: ${compBalance.remaining_hours.toFixed(1)} giờ, Yêu cầu: ${totalHours.toFixed(1)} giờ`
+        ))
+        setResult(null)
+        return
+      }
+    }
+    // 週年制假別（事假/病假/生理假）驗證
+    if (['personal', 'sick', 'physio'].includes(leaveType) && anniversaryBalance) {
+      const requestedDays = totalHours / 8
+      if (requestedDays > anniversaryBalance.remaining_days) {
+        setError(t(lang,
+          `${getLeaveTypeDisplayName(leaveType)}餘額不足，剩餘 ${anniversaryBalance.remaining_days.toFixed(1)} 天，本次申請 ${requestedDays.toFixed(1)} 天`,
+          `Insufficient leave balance. Remaining: ${anniversaryBalance.remaining_days.toFixed(1)} days, Requested: ${requestedDays.toFixed(1)} days`,
+          `Số ngày phép không đủ. Còn lại: ${anniversaryBalance.remaining_days.toFixed(1)} ngày, Yêu cầu: ${requestedDays.toFixed(1)} ngày`
         ))
         setResult(null)
         return
@@ -2060,6 +2102,9 @@ function App() {
                 {t(lang, '員工管理', 'Employee Mgmt', 'Quản lý nhân viên')}
               </button>
             )}
+            <button type="button" onClick={() => gotoSection('leave-rules', 'leave-rules-section')}>
+              {t(lang, '假別規則說明', 'Leave Rules', 'Quy định nghỉ phép')}
+            </button>
             <button type="button" onClick={handleLogout}>
               {t(lang, '登出', 'Logout', 'Đăng xuất')}
             </button>
@@ -2119,6 +2164,32 @@ function App() {
             </div>
             <div className="badge">PWA</div>
           </header>
+
+          {activeSection === 'leave-rules' && (
+            <section id="leave-rules-section" className="card result-card">
+              <h2>{t(lang, '假別規則說明', 'Leave Rules', 'Quy định nghỉ phép')}</h2>
+              <div className="employee-table-wrap">
+                <table className="employee-table">
+                  <thead>
+                    <tr>
+                      <th>{t(lang, '假別', 'Leave Type', 'Loại nghỉ')}</th>
+                      <th>{t(lang, '最小單位', 'Min Unit', 'Đơn vị nhỏ nhất')}</th>
+                      <th>{t(lang, '說明', 'Description', 'Mô tả')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {leaveTypeOptions.map(item => (
+                      <tr key={item.code}>
+                        <td>{getLeaveTypeDisplayName(item.code)}</td>
+                        <td>{item.min_hours} {item.min_unit}</td>
+                        <td style={{ fontSize: '13px' }}>{item.description_zh}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
 
           {activeSection === 'employees' && canManageEmployees && (
             <section id="employee-section" className="card result-card">
@@ -2281,9 +2352,12 @@ function App() {
                           onChange={e => {
                             const val = e.target.value
                             setLeaveType(val)
+                            setAnnualBalance(null)
+                            setCompBalance(null)
+                            setAnniversaryBalance(null)
                             if (val === 'annual') loadAnnualBalance()
                             else if (val === 'comp') loadCompBalance()
-                            else { setAnnualBalance(null); setCompBalance(null) }
+                            else if (['personal', 'sick', 'physio'].includes(val)) loadAnniversaryBalance(val)
                           }}
                         >
                           {leaveTypeOptions.map(item => (
@@ -2341,6 +2415,26 @@ function App() {
                               </>
                             ) : (
                               <span style={{ color: '#999' }}>查詢補休餘額中或無資料</span>
+                            )}
+                          </div>
+                        )}
+                        {['personal', 'sick', 'physio'].includes(leaveType) && (
+                          <div className="note-box" style={{ borderLeft: '4px solid #0891b2', paddingLeft: '12px' }}>
+                            {anniversaryBalanceLoading ? (
+                              <span>計算餘額中...</span>
+                            ) : anniversaryBalance ? (
+                              <>
+                                <div>📅 計算區間：{anniversaryBalance.period.startDate} ~ {anniversaryBalance.period.endDate}</div>
+                                <div>🎯 年度上限：<strong>{anniversaryBalance.limit_days} 天</strong></div>
+                                <div>✅ 已使用：{anniversaryBalance.used_days.toFixed(1)} 天（{anniversaryBalance.used_hours} 小時）</div>
+                                <div style={{ color: anniversaryBalance.remaining_days <= 0 ? '#dc2626' : '#16a34a' }}>
+                                  {anniversaryBalance.remaining_days <= 0
+                                    ? `❌ 額度已用完，無法申請`
+                                    : `✅ 剩餘：${anniversaryBalance.remaining_days.toFixed(1)} 天`}
+                                </div>
+                              </>
+                            ) : (
+                              <span style={{ color: '#999' }}>尚未設定到職日，請人資先填寫員工到職日</span>
                             )}
                           </div>
                         )}
