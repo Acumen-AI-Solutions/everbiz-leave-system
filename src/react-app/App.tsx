@@ -29,6 +29,9 @@ type FullEmployee = {
   second_proxy_no: string | null
   second_proxy_name: string | null
   pin_code: string
+  hire_date: string | null
+  gender: string | null
+  employee_category: string | null
   card_no: string | null
   is_active: number
   created_at: string
@@ -197,7 +200,28 @@ type LeaveTypeOption = {
   name_zh: string
   name_en: string
   name_vi: string
+  min_unit: string
+  min_hours: number
+  description_zh: string
+  has_expiry: number
+  gender_limit: string | null
   sort_order: number
+}
+
+type AnnualLeaveBalance = {
+  annual_days: number
+  used_hours: number
+  used_days: number
+  remaining_days: number
+  months_worked: number
+  hire_date: string
+}
+
+type CompBalance = {
+  earned_hours: number
+  used_hours: number
+  remaining_hours: number
+  remaining_days: number
 }
 
 type FormType = 'leave' | 'punch' | 'overtime'
@@ -417,7 +441,7 @@ function App() {
     employee_no: '', employee_name: '', department_name: '', position_title: '',
     rank_type: '', direct_manager_no: '', direct_manager_name: '',
     first_proxy_no: '', first_proxy_name: '', second_proxy_no: '', second_proxy_name: '',
-    pin_code: '', card_no: '', is_active: 1
+    pin_code: '', hire_date: '', gender: '', employee_category: 'indirect', card_no: '', is_active: 1
   })
 
   const [employeeNo, setEmployeeNo] = useState('')
@@ -444,6 +468,7 @@ function App() {
   const [overtimeEnd, setOvertimeEnd] = useState('19:30')
   const [overtimeReason, setOvertimeReason] = useState('')
   const [overtimeMessage, setOvertimeMessage] = useState('')
+  const [payMethod, setPayMethod] = useState('overtime_pay')
 
   const [overtimeImportRows, setOvertimeImportRows] = useState<OvertimeImportRow[]>([])
   const [overtimeImportMessage, setOvertimeImportMessage] = useState('')
@@ -488,6 +513,11 @@ function App() {
   const [attendanceSummary, setAttendanceSummary] = useState<AttendanceSummary[]>([])
   const [summaryMessage, setSummaryMessage] = useState('')
   const [isLoadingSummary, setIsLoadingSummary] = useState(false)
+
+  const [annualBalance, setAnnualBalance] = useState<AnnualLeaveBalance | null>(null)
+  const [annualBalanceLoading, setAnnualBalanceLoading] = useState(false)
+  const [compBalance, setCompBalance] = useState<CompBalance | null>(null)
+  const [compBalanceLoading, setCompBalanceLoading] = useState(false)
 
   const [importTxtResult, setImportTxtResult] = useState('')
   const [importOvertimeResult, setImportOvertimeResult] = useState('')
@@ -552,12 +582,45 @@ function App() {
     return found.name_vi
   }
 
+  // 載入特休餘額
+  async function loadAnnualBalance() {
+    if (!currentUser) return
+    setAnnualBalanceLoading(true)
+    try {
+      const year = new Date().getFullYear()
+      const res = await fetch(`${API_BASE}/api/leave/annual-balance?employee_no=${encodeURIComponent(currentUser.employee_no)}&year=${year}`)
+      const data = await res.json()
+      if (data.ok) setAnnualBalance(data)
+      else setAnnualBalance(null)
+    } catch {
+      setAnnualBalance(null)
+    } finally {
+      setAnnualBalanceLoading(false)
+    }
+  }
+
+  // 載入補休餘額
+  async function loadCompBalance() {
+    if (!currentUser) return
+    setCompBalanceLoading(true)
+    try {
+      const res = await fetch(`${API_BASE}/api/leave/comp-balance?employee_no=${encodeURIComponent(currentUser.employee_no)}`)
+      const data = await res.json()
+      if (data.ok) setCompBalance(data)
+      else setCompBalance(null)
+    } catch {
+      setCompBalance(null)
+    } finally {
+      setCompBalanceLoading(false)
+    }
+  }
+
   function resetEmployeeForm() {
     setEmployeeFormData({
       employee_no: '', employee_name: '', department_name: '', position_title: '',
       rank_type: '', direct_manager_no: '', direct_manager_name: '',
       first_proxy_no: '', first_proxy_name: '', second_proxy_no: '', second_proxy_name: '',
-      pin_code: '', card_no: '', is_active: 1
+      pin_code: '', hire_date: '', gender: '', employee_category: 'indirect', card_no: '', is_active: 1
     })
     setEditingEmployee(null)
     setShowEmployeeForm(false)
@@ -578,6 +641,9 @@ function App() {
       second_proxy_no: emp.second_proxy_no || '',
       second_proxy_name: emp.second_proxy_name || '',
       pin_code: emp.pin_code || '',
+      hire_date: emp.hire_date || '',
+      gender: emp.gender || '',
+      employee_category: emp.employee_category || 'indirect',
       card_no: emp.card_no || '',
       is_active: emp.is_active
     })
@@ -785,6 +851,8 @@ function App() {
     setImportCardResult('')
     setOvertimeImportMessage('')
     setOvertimeImportRows([])
+    setAnnualBalance(null)
+    setCompBalance(null)
   }
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -806,6 +874,33 @@ function App() {
       setResult(null)
       return
     }
+
+    // 特休餘額驗證
+    if (leaveType === 'annual' && annualBalance) {
+      const requestedDays = totalHours / 8
+      if (requestedDays > annualBalance.remaining_days) {
+        setError(t(lang,
+          `特休餘額不足，剩餘 ${annualBalance.remaining_days.toFixed(1)} 天，本次申請 ${requestedDays.toFixed(1)} 天`,
+          `Insufficient annual leave. Remaining: ${annualBalance.remaining_days.toFixed(1)} days, Requested: ${requestedDays.toFixed(1)} days`,
+          `Số ngày phép không đủ. Còn lại: ${annualBalance.remaining_days.toFixed(1)} ngày, Yêu cầu: ${requestedDays.toFixed(1)} ngày`
+        ))
+        setResult(null)
+        return
+      }
+    }
+    // 補休餘額驗證
+    if (leaveType === 'comp' && compBalance) {
+      if (totalHours > compBalance.remaining_hours) {
+        setError(t(lang,
+          `補休餘額不足，剩餘 ${compBalance.remaining_hours.toFixed(1)} 小時，本次申請 ${totalHours.toFixed(1)} 小時`,
+          `Insufficient comp leave. Remaining: ${compBalance.remaining_hours.toFixed(1)} hr(s), Requested: ${totalHours.toFixed(1)} hr(s)`,
+          `Số giờ nghỉ bù không đủ. Còn lại: ${compBalance.remaining_hours.toFixed(1)} giờ, Yêu cầu: ${totalHours.toFixed(1)} giờ`
+        ))
+        setResult(null)
+        return
+      }
+    }
+
     if (totalHours > 24) {
       const confirmMsg = t(lang,
         '您申請的請假時數超過三天，主管核准後將再送董事長審核，確定送出嗎？',
@@ -934,6 +1029,7 @@ function App() {
           end_time: overtimeEnd,
           total_hours: overtimeHours,
           reason: overtimeReason,
+          pay_method: payMethod,
         }),
       })
       const data = await response.json()
@@ -1083,9 +1179,9 @@ function App() {
         setImportTxtResult(data.message || '匯入失敗')
       } else {
         const errorText = data.errors?.length
-  ? `\n錯誤明細：\n${data.errors.join('\n')}`
-  : ''
-setImportTxtResult(`成功 ${data.inserted} 筆，錯誤 ${data.errors?.length || 0} 筆${errorText}`)
+          ? `\n錯誤明細：\n${data.errors.join('\n')}`
+          : ''
+        setImportTxtResult(`成功 ${data.inserted} 筆，錯誤 ${data.errors?.length || 0} 筆${errorText}`)
         if (activeRecordTab === 'attendance') await loadAttendance()
       }
     } catch (err) {
@@ -2072,6 +2168,27 @@ setImportTxtResult(`成功 ${data.inserted} 筆，錯誤 ${data.errors?.length |
                       <input type="text" placeholder={t(lang, '登入 PIN 碼', 'Login PIN Code', 'Mã PIN đăng nhập')} value={employeeFormData.pin_code} onChange={e => setEmployeeFormData({ ...employeeFormData, pin_code: e.target.value })} />
                     </div>
                     <div className="two">
+                      <div>
+                        <label style={{ fontSize: '13px', color: '#666', display: 'block', marginBottom: '4px' }}>{t(lang, '到職日', 'Hire Date', 'Ngày vào làm')}</label>
+                        <input type="date" value={employeeFormData.hire_date} onChange={e => setEmployeeFormData({ ...employeeFormData, hire_date: e.target.value })} />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '13px', color: '#666', display: 'block', marginBottom: '4px' }}>{t(lang, '性別', 'Gender', 'Giới tính')}</label>
+                        <select value={employeeFormData.gender} onChange={e => setEmployeeFormData({ ...employeeFormData, gender: e.target.value })}>
+                          <option value="">{t(lang, '請選擇', 'Select', 'Chọn')}</option>
+                          <option value="male">{t(lang, '男', 'Male', 'Nam')}</option>
+                          <option value="female">{t(lang, '女', 'Female', 'Nữ')}</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="two">
+                      <div>
+                        <label style={{ fontSize: '13px', color: '#666', display: 'block', marginBottom: '4px' }}>{t(lang, '人員類別（影響加班處理方式）', 'Employee Category (affects overtime handling)', 'Loại nhân viên (ảnh hưởng đến xử lý tăng ca)')}</label>
+                        <select value={employeeFormData.employee_category} onChange={e => setEmployeeFormData({ ...employeeFormData, employee_category: e.target.value })}>
+                          <option value="direct">{t(lang, '直接人員（領加班費）', 'Direct (Overtime Pay)', 'Trực tiếp (lương tăng ca)')}</option>
+                          <option value="indirect">{t(lang, '間接人員（換補休）', 'Indirect (Comp Leave)', 'Gián tiếp (nghỉ bù)')}</option>
+                        </select>
+                      </div>
                       <input type="text" placeholder={t(lang, 'RFID 卡號 (選填)', 'RFID Card No. (optional)', 'Mã thẻ RFID (tùy chọn)')} value={employeeFormData.card_no} onChange={e => setEmployeeFormData({ ...employeeFormData, card_no: e.target.value })} />
                     </div>
                     <div className="employee-active-row">
@@ -2101,6 +2218,9 @@ setImportTxtResult(`成功 ${data.inserted} 筆，錯誤 ${data.errors?.length |
                         <th>{t(lang, '主管', 'Manager', 'Quản lý')}</th>
                         <th>{t(lang, '第一代理人', '1st Proxy', 'Đại diện 1')}</th>
                         <th>{t(lang, '第二代理人', '2nd Proxy', 'Đại diện 2')}</th>
+                        <th>{t(lang, '到職日', 'Hire Date', 'Ngày vào làm')}</th>
+                        <th>{t(lang, '性別', 'Gender', 'Giới tính')}</th>
+                        <th>{t(lang, '人員類別', 'Category', 'Loại NV')}</th>
                         <th>{t(lang, '卡號', 'Card No.', 'Mã thẻ')}</th>
                         <th>{t(lang, '狀態', 'Status', 'Trạng thái')}</th>
                         <th>{t(lang, '操作', 'Actions', 'Hành động')}</th>
@@ -2116,6 +2236,9 @@ setImportTxtResult(`成功 ${data.inserted} 筆，錯誤 ${data.errors?.length |
                           <td>{emp.direct_manager_name} ({emp.direct_manager_no})</td>
                           <td>{emp.first_proxy_name} ({emp.first_proxy_no})</td>
                           <td>{emp.second_proxy_name} ({emp.second_proxy_no})</td>
+                          <td>{emp.hire_date || '-'}</td>
+                          <td>{emp.gender === 'male' ? t(lang, '男', 'Male', 'Nam') : emp.gender === 'female' ? t(lang, '女', 'Female', 'Nữ') : '-'}</td>
+                          <td>{emp.employee_category === 'direct' ? t(lang, '直接', 'Direct', 'Trực tiếp') : t(lang, '間接', 'Indirect', 'Gián tiếp')}</td>
                           <td>{emp.card_no || ''}</td>
                           <td>{emp.is_active ? t(lang, '啟用', 'Active', 'Kích hoạt') : t(lang, '停用', 'Inactive', 'Vô hiệu')}</td>
                           <td>
@@ -2153,13 +2276,74 @@ setImportTxtResult(`成功 ${data.inserted} 筆，錯誤 ${data.errors?.length |
                       <form onSubmit={handleSubmit}>
                         <input value={employeeNo} readOnly placeholder={t(lang, '員工編號', 'Employee No.', 'Mã nhân viên')} />
                         <input value={employeeName} readOnly placeholder={t(lang, '姓名', 'Name', 'Tên')} />
-                        <select value={leaveType} onChange={e => setLeaveType(e.target.value)}>
+                        <select
+                          value={leaveType}
+                          onChange={e => {
+                            const val = e.target.value
+                            setLeaveType(val)
+                            if (val === 'annual') loadAnnualBalance()
+                            else if (val === 'comp') loadCompBalance()
+                            else { setAnnualBalance(null); setCompBalance(null) }
+                          }}
+                        >
                           {leaveTypeOptions.map(item => (
                             <option key={item.code} value={item.code}>
                               {getLeaveTypeDisplayName(item.code)}
                             </option>
                           ))}
                         </select>
+                        {(() => {
+                          const selected = leaveTypeOptions.find(opt => opt.code === leaveType)
+                          return selected?.description_zh ? (
+                            <div className="note-box" style={{ fontSize: '13px', color: '#555' }}>
+                              📋 {selected.description_zh}
+                              {selected.min_hours > 0 && (
+                                <span style={{ marginLeft: '8px', color: '#0891b2' }}>
+                                  （最小單位：{selected.min_hours} {selected.min_unit}）
+                                </span>
+                              )}
+                            </div>
+                          ) : null
+                        })()}
+                        {leaveType === 'annual' && (
+                          <div className="note-box" style={{ borderLeft: '4px solid #0891b2', paddingLeft: '12px' }}>
+                            {annualBalanceLoading ? (
+                              <span>計算特休餘額中...</span>
+                            ) : annualBalance ? (
+                              <>
+                                <div>📅 到職日：{annualBalance.hire_date}（年資 {annualBalance.months_worked} 個月）</div>
+                                <div>🎯 今年應得特休：<strong>{annualBalance.annual_days} 天</strong></div>
+                                <div>✅ 已使用：{annualBalance.used_days.toFixed(1)} 天（{annualBalance.used_hours} 小時）</div>
+                                <div style={{ color: annualBalance.remaining_days <= 0 ? '#dc2626' : '#16a34a' }}>
+                                  {annualBalance.remaining_days <= 0
+                                    ? `❌ 特休已用完，無法申請`
+                                    : `✅ 剩餘：${annualBalance.remaining_days.toFixed(1)} 天`}
+                                </div>
+                              </>
+                            ) : (
+                              <span style={{ color: '#999' }}>尚未設定到職日，請人資先填寫員工到職日</span>
+                            )}
+                          </div>
+                        )}
+                        {leaveType === 'comp' && (
+                          <div className="note-box" style={{ borderLeft: '4px solid #0891b2', paddingLeft: '12px' }}>
+                            {compBalanceLoading ? (
+                              <span>計算補休餘額中...</span>
+                            ) : compBalance ? (
+                              <>
+                                <div>🎯 已累積補休：<strong>{compBalance.earned_hours.toFixed(1)} 小時</strong></div>
+                                <div>✅ 已使用：{compBalance.used_hours.toFixed(1)} 小時</div>
+                                <div style={{ color: compBalance.remaining_hours <= 0 ? '#dc2626' : '#16a34a' }}>
+                                  {compBalance.remaining_hours <= 0
+                                    ? `❌ 補休已用完，無法申請`
+                                    : `✅ 剩餘：${compBalance.remaining_hours.toFixed(1)} 小時（約 ${compBalance.remaining_days.toFixed(1)} 天）`}
+                                </div>
+                              </>
+                            ) : (
+                              <span style={{ color: '#999' }}>查詢補休餘額中或無資料</span>
+                            )}
+                          </div>
+                        )}
                         <div className="two">
                           <input type="date" value={startDate} onChange={e => { setStartDate(e.target.value); setTotalHours(calculateLeaveHours(e.target.value, startTime, endDate, endTime)) }} />
                           <select value={startTime} onChange={e => { setStartTime(e.target.value); setTotalHours(calculateLeaveHours(startDate, e.target.value, endDate, endTime)) }}>{timeOptions.map(t => <option key={t} value={t}>{t}</option>)}</select>
@@ -2208,6 +2392,13 @@ setImportTxtResult(`成功 ${data.inserted} 筆，錯誤 ${data.errors?.length |
                         <div className="two">
                           <select value={overtimeStart} onChange={e => setOvertimeStart(e.target.value)}>{timeOptions.map(t => <option key={t} value={t}>{t}</option>)}</select>
                           <select value={overtimeEnd} onChange={e => setOvertimeEnd(e.target.value)}>{timeOptions.map(t => <option key={t} value={t}>{t}</option>)}</select>
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '13px', color: '#666', display: 'block', marginBottom: '4px' }}>{t(lang, '本次加班希望', 'This overtime should be', 'Tăng ca này muốn')}</label>
+                          <select value={payMethod} onChange={e => setPayMethod(e.target.value)}>
+                            <option value="overtime_pay">{t(lang, '領加班費', 'Receive Overtime Pay', 'Nhận lương tăng ca')}</option>
+                            <option value="comp_leave">{t(lang, '換補休', 'Convert to Comp Leave', 'Đổi thành nghỉ bù')}</option>
+                          </select>
                         </div>
                         <div className="note-box">{t(lang, `加班時數：${calculateSimpleHours(overtimeStart, overtimeEnd)} 小時`, `Overtime hours: ${calculateSimpleHours(overtimeStart, overtimeEnd)} hr(s)`, `Số giờ tăng ca: ${calculateSimpleHours(overtimeStart, overtimeEnd)} giờ`)}</div>
                         <textarea rows={5} value={overtimeReason} onChange={e => setOvertimeReason(e.target.value)} placeholder={t(lang, '加班原因 / 工作內容', 'Reason / Work content', 'Lý do / Nội dung công việc')} />
