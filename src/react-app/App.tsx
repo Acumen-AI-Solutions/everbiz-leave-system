@@ -965,9 +965,9 @@ function App() {
     if (['personal', 'sick', 'physio'].includes(leaveType)) {
       if (!anniversaryBalance) {
         setError(t(lang,
-          '無法確認此假別餘額（員工尚未設定到職日），請聯絡人資設定後再申請',
-          'Cannot verify leave balance (hire date not set). Please contact HR.',
-          'Không thể xác minh số ngày nghỉ còn lại (chưa thiết lập ngày vào làm). Vui lòng liên hệ HR.'
+          '無法確認此假別餘額，請稍後再試或聯絡人資',
+          'Cannot verify leave balance. Please try again or contact HR.',
+          'Không thể xác minh số ngày nghỉ còn lại. Vui lòng thử lại hoặc liên hệ HR.'
         ))
         setResult(null)
         return
@@ -2474,8 +2474,8 @@ function App() {
                               <span>計算餘額中...</span>
                             ) : anniversaryBalance ? (
                               <>
-                                <div>📅 計算區間：{anniversaryBalance.period.startDate} ~ {anniversaryBalance.period.endDate}</div>
-                                <div>🎯 年度上限：<strong>{anniversaryBalance.limit_days} 天</strong></div>
+                                <div>📅 計算區間（曆年制）：{anniversaryBalance.period.startDate} ~ {anniversaryBalance.period.endDate}</div>
+                                <div>🎯 年度上限：<strong>{anniversaryBalance.limit_days} 天</strong>（依勞工請假規則 / 性別工作平等法）</div>
                                 <div>✅ 已使用：{anniversaryBalance.used_days.toFixed(1)} 天（{anniversaryBalance.used_hours} 小時）</div>
                                 <div style={{ color: anniversaryBalance.remaining_days <= 0 ? '#dc2626' : '#16a34a' }}>
                                   {anniversaryBalance.remaining_days <= 0
@@ -2484,7 +2484,7 @@ function App() {
                                 </div>
                               </>
                             ) : (
-                              <span style={{ color: '#999' }}>尚未設定到職日，請人資先填寫員工到職日</span>
+                              <span style={{ color: '#999' }}>查詢餘額中或發生錯誤，請稍後再試</span>
                             )}
                           </div>
                         )}
