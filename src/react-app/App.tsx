@@ -47,6 +47,7 @@ type CurrentUser = {
   direct_manager_no?: string
   direct_manager_name?: string
   system_role?: string
+  gender?: string | null   // 新增性别字段
   is_active: number
 }
 
@@ -760,6 +761,7 @@ function App() {
     }
   }
 
+  // ========== 修正 loadEmployees：取得性別 ==========
   async function loadEmployees() {
     try {
       const res = await fetch(`${API_BASE}/api/employees`)
@@ -770,6 +772,14 @@ function App() {
           setEmployeeList([])
           return
         }
+
+        // ---- 嘗試取得目前使用者的性別 ----
+        const myInfo = allEmployees.find(emp => emp.employee_no === currentUser.employee_no)
+        if (myInfo && (myInfo as any).gender && !currentUser.gender) {
+          setCurrentUser(prev => prev ? { ...prev, gender: (myInfo as any).gender } : prev)
+        }
+
+        // ---- 原有過濾邏輯 ----
         const role = currentUser.system_role
         if (role === 'hr' || role === 'general_manager') {
           setEmployeeList(allEmployees)
@@ -885,7 +895,7 @@ function App() {
     setAnniversaryBalance(null)
   }
 
-  // ==================== handleSubmit（含特休整天驗證） ====================
+  // ==================== handleSubmit（含性別驗證） ====================
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (isSubmitting) return
@@ -906,9 +916,8 @@ function App() {
       return
     }
 
-    // ========== 特休驗證（曆年制 + 整天限制） ==========
+    // ========== 特休驗證 ==========
     if (leaveType === 'annual') {
-      // 特休只能整天（8的倍數）
       if (totalHours % 8 !== 0) {
         setError(t(lang,
           '特休僅能以「天」為單位申請（需為 8 小時的整數倍），請確認日期區間',
@@ -978,6 +987,29 @@ function App() {
           `${getLeaveTypeDisplayName(leaveType)}餘額不足，剩餘 ${anniversaryBalance.remaining_days.toFixed(1)} 天，本次申請 ${requestedDays.toFixed(1)} 天`,
           `Insufficient leave balance. Remaining: ${anniversaryBalance.remaining_days.toFixed(1)} days, Requested: ${requestedDays.toFixed(1)} days`,
           `Số ngày phép không đủ. Còn lại: ${anniversaryBalance.remaining_days.toFixed(1)} ngày, Yêu cầu: ${requestedDays.toFixed(1)} ngày`
+        ))
+        setResult(null)
+        return
+      }
+    }
+
+    // ========== 性別限制驗證（產假等） ==========
+    const selectedLeave = leaveTypeOptions.find(opt => opt.code === leaveType)
+    if (selectedLeave?.gender_limit) {
+      if (!currentUser?.gender) {
+        setError(t(lang,
+          '無法確認您的性別，請聯絡 HR 設定後再申請此假別。',
+          'Unable to verify gender. Please contact HR to set your gender.',
+          'Không thể xác minh giới tính. Vui lòng liên hệ HR để thiết lập.'
+        ))
+        setResult(null)
+        return
+      }
+      if (currentUser.gender !== selectedLeave.gender_limit) {
+        setError(t(lang,
+          `此假別僅限 ${selectedLeave.gender_limit === 'female' ? '女性' : '男性'} 申請。`,
+          `This leave type is for ${selectedLeave.gender_limit === 'female' ? 'female' : 'male'} only.`,
+          `Loại nghỉ này chỉ dành cho ${selectedLeave.gender_limit === 'female' ? 'nữ' : 'nam'}.`
         ))
         setResult(null)
         return
@@ -2066,7 +2098,6 @@ function App() {
   }
 
   // ==================== useEffect 區塊 ====================
-  // 1. 載入員工、假別等
   useEffect(() => {
     if (!currentUser) return
     loadEmployees()
@@ -2079,7 +2110,6 @@ function App() {
     }
   }, [currentUser])
 
-  // 2. 設定預設 leaveType
   useEffect(() => {
     if (leaveTypeOptions.length > 0) {
       const exists = leaveTypeOptions.some(opt => opt.code === leaveType)
@@ -2089,7 +2119,6 @@ function App() {
     }
   }, [leaveTypeOptions, leaveType])
 
-  // ===== 新增：自動載入餘額 =====
   useEffect(() => {
     if (!currentUser || !leaveType) return
     setAnnualBalance(null)
@@ -2100,7 +2129,6 @@ function App() {
     else if (['personal', 'sick', 'physio'].includes(leaveType)) loadAnniversaryBalance(leaveType)
   }, [leaveType, currentUser])
 
-  // 3. 載入待審核
   useEffect(() => {
     if (currentUser?.employee_no) {
       setApproverNo(currentUser.employee_no)
@@ -2407,13 +2435,19 @@ function App() {
                         <input value={employeeName} readOnly placeholder={t(lang, '姓名', 'Name', 'Tên')} />
                         <select
                           value={leaveType}
-                          onChange={e => setLeaveType(e.target.value)} // 僅更新狀態，查詢由 useEffect 處理
+                          onChange={e => setLeaveType(e.target.value)}
                         >
-                          {leaveTypeOptions.map(item => (
-                            <option key={item.code} value={item.code}>
-                              {getLeaveTypeDisplayName(item.code)}
-                            </option>
-                          ))}
+                          {leaveTypeOptions
+                            .filter(item => {
+                              if (!item.gender_limit) return true
+                              if (!currentUser?.gender) return true
+                              return item.gender_limit === currentUser.gender
+                            })
+                            .map(item => (
+                              <option key={item.code} value={item.code}>
+                                {getLeaveTypeDisplayName(item.code)}
+                              </option>
+                            ))}
                         </select>
                         {(() => {
                           const selected = leaveTypeOptions.find(opt => opt.code === leaveType)
@@ -2532,7 +2566,6 @@ function App() {
                         <div className="note-box">{t(lang, `請假時數：${totalHours} 小時`, `Leave hours: ${totalHours} hr(s)`, `Số giờ nghỉ: ${totalHours} giờ`)}</div>
                         <textarea rows={5} value={reason} onChange={e => setReason(e.target.value)} placeholder={t(lang, '請假原因', 'Reason for leave', 'Lý do nghỉ phép')} />
 
-                        {/* ===== 醒目紅色錯誤框（按鈕正上方） ===== */}
                         {error && (
                           <div
                             style={{
